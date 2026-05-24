@@ -49,8 +49,7 @@ private func run(input: String) async {
         ]
 
         let instructions = """
-        You are the local planning core for Airi, a Mac copilot for actions.
-        Convert the user's request into a calendar proposal.
+        Create one calendar event proposal from one calendar task.
 
         Rules:
         - Do not claim that events were created.
@@ -71,10 +70,33 @@ private func run(input: String) async {
             model: model,
             tools: [],
             instructions: """
-            Split the user's request into independent tasks.
-            Do not create calendar events.
-            Do not invent names, dates, or participants.
-            Suggest tools only from: resolveRelativeDate, findContactCandidates, listCalendars.
+            Split the user request into independent actionable tasks.
+
+            For each task, return:
+            - the task text
+            - the task type
+            - suggested tools, if any
+
+            Available task types:
+            - calendarEvent: create or change a calendar event
+            - reminder: create or change a reminder
+            - note: create, update, or summarize notes
+            - file: find, open, move, rename, or summarize files
+            - app: open or control an app
+            - clipboard: read, transform, or use clipboard content
+            - unknown: the request is unclear or unsupported
+
+            Available tools:
+            - resolveRelativeDate: use when a task contains relative dates or weekdays, such as tomorrow, next Monday, Mittwoch, Freitag
+            - findContactCandidates: use when a task names a person who may need contact lookup, such as Anna or Max
+            - listCalendars: use when a calendar event needs a calendar choice, such as Personal or Work
+
+            Rules:
+            - Do not execute anything.
+            - Do not create calendar events.
+            - Do not invent missing details.
+            - Do not mention any app name.
+            - Suggest only tools from the available tools list.
             """
         )
 
