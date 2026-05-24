@@ -67,19 +67,34 @@ private func run(input: String) async {
         - Output only the requested structured CalendarBatchDraft.
         """
 
+        let plannerSession = LanguageModelSession(
+            model: model,
+            tools: [],
+            instructions: """
+            Split the user's request into independent tasks.
+            Do not create calendar events.
+            Do not invent names, dates, or participants.
+            Suggest tools only from: resolveRelativeDate, findContactCandidates, listCalendars.
+            """
+        )
+
         let today = formattedToday(calendar: calendar)
-        let tasks = TaskSplitter.split(input)
+        let plannedTasks = await planTasks(input: input, session: plannerSession)
+        let fallbackTasks = TaskSplitter.split(input)
+        let tasks = plannedTasks.isEmpty ? fallbackTasks : plannedTasks
         let dateHints = resolvedDateHints(for: input, calendar: calendar)
         print("Step 3 - Local preflight")
         print("Today: \(today)")
         print("Timezone: \(TimeZone.current.identifier)")
-        print("Tasks split before calling the model:")
+        print("Tasks planned before proposal generation:")
         if tasks.isEmpty {
             print("- none")
         } else {
-            for task in tasks {
-                print("- Task \(task.index): \(task.text)")
-            }
+            print(TaskPlanParser.terminalDescription(for: tasks))
+        }
+        if plannedTasks.isEmpty {
+            print("")
+            print("Task planning fallback was used.")
         }
         print("")
         print("Date hints found before calling the model:")
@@ -124,6 +139,8 @@ private func run(input: String) async {
                 print("")
                 print("Task \(result.task.index): \(result.task.text)")
                 print(result.content.terminalCalendarProposalDescription())
+                print("")
+                print(ProposalSanitizer.sanitizedCalendarDescription(for: result))
             }
 
             let checks = ProposalValidator.checks(for: taskResults, dateHints: dateHints)
@@ -208,6 +225,23 @@ private func generateTaskResults(
     }
 
     return results
+}
+
+@available(macOS 26.0, *)
+private func planTasks(input: String, session: LanguageModelSession) async -> [InputTask] {
+    let prompt = """
+    User request:
+    \(input)
+
+    Split this into independent tasks. Keep each task text short and faithful to the user's words.
+    """
+
+    do {
+        let response = try await session.respond(to: prompt, schema: TaskPlanSchema.schema)
+        return TaskPlanParser.inputTasks(from: response.content)
+    } catch {
+        return []
+    }
 }
 
 private func formattedToday(calendar: Calendar) -> String {

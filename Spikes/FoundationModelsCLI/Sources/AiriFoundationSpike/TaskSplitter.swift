@@ -1,8 +1,17 @@
 import Foundation
 
 struct InputTask {
+    enum Source {
+        case model
+        case fallback
+    }
+
     var index: Int
     var text: String
+    var source: Source = .fallback
+    var type: String = "calendarEvent"
+    var suggestedTools: [String] = []
+    var reason: String = ""
 }
 
 enum TaskSplitter {
@@ -21,7 +30,14 @@ enum TaskSplitter {
         let parts = roughParts.isEmpty ? [normalized] : roughParts
 
         return parts.enumerated().map { offset, text in
-            InputTask(index: offset + 1, text: cleanTaskPrefix(text, isFirst: offset == 0))
+            InputTask(
+                index: offset + 1,
+                text: cleanTaskPrefix(text, isFirst: offset == 0),
+                source: .fallback,
+                type: "calendarEvent",
+                suggestedTools: [],
+                reason: "Fallback splitter"
+            )
         }
     }
 
@@ -47,4 +63,3 @@ enum TaskSplitter {
         return text
     }
 }
-

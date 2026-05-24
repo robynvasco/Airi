@@ -114,6 +114,39 @@ extension GeneratedContent {
 }
 
 @available(macOS 26.0, *)
+enum ProposalSanitizer {
+    static func sanitizedCalendarDescription(for result: TaskModelResult) -> String {
+        let explicitPeople = Set(PeopleExtractor.explicitPeople(in: result.task))
+        var lines: [String] = []
+
+        lines.append("Sanitized proposal:")
+        lines.append("Participants are controlled by Airi preflight, not free model output.")
+
+        let events = (try? result.content.value([GeneratedContent].self, forProperty: "events")) ?? []
+        if events.isEmpty {
+            lines.append("- no event")
+            return lines.joined(separator: "\n")
+        }
+
+        for event in events {
+            let title = (try? event.value(String.self, forProperty: "title")) ?? "Untitled"
+            let startDate = (try? event.value(String.self, forProperty: "startDate")) ?? ""
+            let startTime = (try? event.value(String.self, forProperty: "startTime")) ?? ""
+            let duration = (try? event.value(Int.self, forProperty: "durationMinutes")) ?? 0
+            let isAllDay = (try? event.value(Bool.self, forProperty: "isAllDay")) ?? false
+            let participants = explicitPeople.sorted()
+            let datePart = isAllDay ? "\(startDate), all day" : "\(startDate) \(startTime)"
+            let durationPart = duration > 0 ? "\(duration)m" : "duration unknown"
+            let people = participants.isEmpty ? "no participants" : participants.joined(separator: ", ")
+
+            lines.append("- \(title) | \(datePart) | \(durationPart) | \(people)")
+        }
+
+        return lines.joined(separator: "\n")
+    }
+}
+
+@available(macOS 26.0, *)
 struct TaskModelResult {
     var task: InputTask
     var content: GeneratedContent
