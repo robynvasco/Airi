@@ -20,18 +20,23 @@ private func run(input: String) async {
         let model = SystemLanguageModel.default
 
         print("Airi Foundation Models Spike")
-        print("Input: \(input)")
+        print("")
+        print("Step 1 - User input")
+        print(input)
         print("")
 
         switch model.availability {
         case .available:
-            print("Model available: yes")
+            print("Step 2 - Local model")
+            print("Apple Foundation Models is available on this Mac.")
         case .unavailable(let reason):
-            print("Model available: no (\(availabilityDescription(reason)))")
+            print("Step 2 - Local model")
+            print("Apple Foundation Models is not available: \(availabilityDescription(reason))")
             print("")
             print("Enable Apple Intelligence and wait for the on-device model to finish downloading, then run again.")
             return
         }
+        print("")
 
         var calendar = Calendar(identifier: .gregorian)
         calendar.locale = Locale(identifier: "de_DE")
@@ -71,6 +76,19 @@ private func run(input: String) async {
 
         let today = formattedToday(calendar: calendar)
         let dateHints = resolvedDateHints(for: input, calendar: calendar)
+        print("Step 3 - Local preflight")
+        print("Today: \(today)")
+        print("Timezone: \(TimeZone.current.identifier)")
+        print("Date hints found before calling the model:")
+        if dateHints.isEmpty {
+            print("- none")
+        } else {
+            for hint in dateHints {
+                print("- \(hint.phrase) -> \(hint.isoDate)")
+            }
+        }
+        print("")
+
         let prompt = """
         Today is \(today). The local timezone is \(TimeZone.current.identifier).
 
@@ -82,12 +100,25 @@ private func run(input: String) async {
         """
 
         do {
+            print("Step 4 - Ask Apple Intelligence")
+            print("The model receives the user input, the local date hints, the output schema, and the optional tools.")
+            print("")
+
             let response = try await session.respond(to: prompt, schema: CalendarProposalSchema.schema)
             let toolCalls = await recorder.snapshot()
-            let warnings = ProposalValidator.warnings(for: response.content, dateHints: dateHints)
+            let checks = ProposalValidator.checks(for: response.content, dateHints: dateHints)
 
+            print("Step 5 - Tool calls")
+            if toolCalls.isEmpty {
+                print("- none")
+            } else {
+                for call in toolCalls {
+                    print("- \(call)")
+                }
+            }
             print("")
-            print(response.content.terminalCalendarProposalDescription(toolCalls: toolCalls, validationWarnings: warnings))
+
+            print(response.content.terminalCalendarProposalDescription(consistencyChecks: checks))
         } catch {
             print("")
             print("Generation failed:")

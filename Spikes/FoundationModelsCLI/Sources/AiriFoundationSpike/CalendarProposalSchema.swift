@@ -49,18 +49,11 @@ enum CalendarProposalSchema {
 
 @available(macOS 26.0, *)
 extension GeneratedContent {
-    func terminalCalendarProposalDescription(toolCalls: [String], validationWarnings: [String]) -> String {
+    func terminalCalendarProposalDescription(consistencyChecks: [String]) -> String {
         var lines: [String] = []
 
-        lines.append("Tool calls:")
-        if toolCalls.isEmpty {
-            lines.append("- none")
-        } else {
-            lines.append(contentsOf: toolCalls.map { "- \($0)" })
-        }
-
-        lines.append("")
-        lines.append("Proposal:")
+        lines.append("Step 6 - Model proposal")
+        lines.append("Summary:")
         lines.append((try? value(String.self, forProperty: "summary")) ?? "No summary generated.")
         lines.append("")
 
@@ -113,10 +106,12 @@ extension GeneratedContent {
         lines.append("")
         lines.append("Ready for review: \(ready ? "yes" : "no")")
 
-        if !validationWarnings.isEmpty {
-            lines.append("")
-            lines.append("Validation warnings:")
-            lines.append(contentsOf: validationWarnings.map { "- \($0)" })
+        lines.append("")
+        lines.append("Step 7 - Neutral consistency checks")
+        if consistencyChecks.isEmpty {
+            lines.append("- no issues found by the simple checks")
+        } else {
+            lines.append(contentsOf: consistencyChecks.map { "- \($0)" })
         }
 
         lines.append("")
@@ -129,35 +124,26 @@ extension GeneratedContent {
 
 @available(macOS 26.0, *)
 enum ProposalValidator {
-    static func warnings(for content: GeneratedContent, dateHints: [(phrase: String, isoDate: String)]) -> [String] {
-        var warnings: [String] = []
+    static func checks(for content: GeneratedContent, dateHints: [(phrase: String, isoDate: String)]) -> [String] {
+        var checks: [String] = []
 
         let readyForReview = (try? content.value(Bool.self, forProperty: "readyForReview")) ?? false
         let questions = (try? content.value([GeneratedContent].self, forProperty: "clarificationQuestions")) ?? []
         let events = (try? content.value([GeneratedContent].self, forProperty: "events")) ?? []
 
         if readyForReview && !questions.isEmpty {
-            warnings.append("readyForReview is true even though clarificationQuestions is not empty.")
+            checks.append("The proposal says it is ready, but it still contains clarification questions.")
         }
 
         if !readyForReview && questions.isEmpty {
-            warnings.append("readyForReview is false but no clarification question was generated.")
+            checks.append("The proposal says it is not ready, but it does not explain what needs clarification.")
         }
 
         let eventDates = Set(events.compactMap { try? $0.value(String.self, forProperty: "startDate") })
         for hint in dateHints where !eventDates.contains(hint.isoDate) {
-            warnings.append("Resolved date hint '\(hint.phrase) -> \(hint.isoDate)' is not represented in event start dates.")
+            checks.append("The local date hint '\(hint.phrase) -> \(hint.isoDate)' does not appear in the generated event dates.")
         }
 
-        for event in events {
-            let title = ((try? event.value(String.self, forProperty: "title")) ?? "").lowercased()
-            let participants = (try? event.value([String].self, forProperty: "participants")) ?? []
-
-            if (title.contains("zahnarzt") || title.contains("dentist")), !participants.isEmpty {
-                warnings.append("Dentist event has participants \(participants.joined(separator: ", ")); this may be participant leakage from another event.")
-            }
-        }
-
-        return warnings
+        return checks
     }
 }

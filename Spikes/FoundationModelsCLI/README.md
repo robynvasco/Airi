@@ -6,8 +6,11 @@ This spike tests the technical core of Airi without UI:
 - guided generation with `DynamicGenerationSchema`
 - tool calling with local Swift tools
 - a typed calendar proposal printed to the terminal
+- a transparent step-by-step trace of what happens
 
 It does not create real calendar events.
+It also does not ask follow-up questions yet. It only prints questions the model thinks
+Airi might need to ask later.
 
 ## Run
 
