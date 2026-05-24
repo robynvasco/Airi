@@ -55,8 +55,13 @@ permissions and execution behavior.
 See [docs/architecture-rfc.md](docs/architecture-rfc.md) for the first technical
 direction.
 
+## Spikes
+
+- [Foundation Models CLI](Spikes/FoundationModelsCLI/README.md): tests local model
+  availability, tool calling, dynamic guided generation, and deterministic validation
+  without any UI.
+
 ## Status
 
 Airi is at the product and architecture stage. The repository is intentionally small
 until the core capability system is clear.
-
