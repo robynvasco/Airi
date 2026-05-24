@@ -43,9 +43,8 @@ private func run(input: String) async {
         calendar.timeZone = .current
 
         let recorder = ToolCallRecorder()
-        let tools: [any Tool] = [
+        let baseTools: [any Tool] = [
             ResolveRelativeDateTool(recorder: recorder, calendar: calendar, referenceDate: Date()),
-            FindContactCandidatesTool(recorder: recorder),
             ListCalendarsTool(recorder: recorder)
         ]
 
@@ -67,12 +66,6 @@ private func run(input: String) async {
         - Prefer the Personal calendar unless the user indicates work.
         - Output only the requested structured CalendarBatchDraft.
         """
-
-        let session = LanguageModelSession(
-            model: model,
-            tools: tools,
-            instructions: instructions
-        )
 
         let today = formattedToday(calendar: calendar)
         let tasks = TaskSplitter.split(input)
@@ -99,42 +92,50 @@ private func run(input: String) async {
         }
         print("")
 
-        let prompt = """
-        Today is \(today). The local timezone is \(TimeZone.current.identifier).
-
-        Authoritative date hints from deterministic local preflight:
-        \(dateHints.isEmpty ? "- none" : dateHints.map { "- \($0.phrase): \($0.isoDate)" }.joined(separator: "\n"))
-
-        Task split from local preflight:
-        \(tasks.isEmpty ? "- none" : tasks.map { "- Task \($0.index): \($0.text)" }.joined(separator: "\n"))
-
-        Use the task split as a strong hint. Each task usually maps to one event.
-        Keep names, dates, and participants attached to the task where they appear.
-
-        User request:
-        \(input)
-        """
-
         do {
             print("Step 4 - Ask Apple Intelligence")
-            print("The model receives the user input, the local date hints, the output schema, and the optional tools.")
+            print("Each task gets its own model call, plus the original input for context.")
             print("")
 
-            let response = try await session.respond(to: prompt, schema: CalendarProposalSchema.schema)
-            let toolCalls = await recorder.snapshot()
-            let checks = ProposalValidator.checks(for: response.content, dateHints: dateHints)
+            let taskResults = try await generateTaskResults(
+                tasks: tasks,
+                fallbackInput: input,
+                today: today,
+                dateHints: dateHints,
+                model: model,
+                baseTools: baseTools,
+                contactTool: FindContactCandidatesTool(recorder: recorder),
+                instructions: instructions
+            )
+            let allToolCalls = await recorder.snapshot()
 
             print("Step 5 - Tool calls")
-            if toolCalls.isEmpty {
+            if allToolCalls.isEmpty {
                 print("- none")
             } else {
-                for call in toolCalls {
+                for call in allToolCalls {
                     print("- \(call)")
                 }
             }
             print("")
 
-            print(response.content.terminalCalendarProposalDescription(consistencyChecks: checks))
+            print("Step 6 - Model proposals by task")
+            for result in taskResults {
+                print("")
+                print("Task \(result.task.index): \(result.task.text)")
+                print(result.content.terminalCalendarProposalDescription())
+            }
+
+            let checks = ProposalValidator.checks(for: taskResults, dateHints: dateHints)
+            print("")
+            print("Step 7 - Neutral consistency checks")
+            if checks.isEmpty {
+                print("- no issues found by the simple checks")
+            } else {
+                for check in checks {
+                    print("- \(check)")
+                }
+            }
         } catch {
             print("")
             print("Generation failed:")
@@ -156,6 +157,57 @@ private func availabilityDescription(
     @unknown default:
         return "unknown"
     }
+}
+
+@available(macOS 26.0, *)
+private func generateTaskResults(
+    tasks: [InputTask],
+    fallbackInput: String,
+    today: String,
+    dateHints: [(phrase: String, isoDate: String)],
+    model: SystemLanguageModel,
+    baseTools: [any Tool],
+    contactTool: FindContactCandidatesTool,
+    instructions: String
+) async throws -> [TaskModelResult] {
+    let effectiveTasks = tasks.isEmpty
+        ? [InputTask(index: 1, text: fallbackInput)]
+        : tasks
+
+    var results: [TaskModelResult] = []
+
+    for task in effectiveTasks {
+        let people = PeopleExtractor.explicitPeople(in: task)
+        let tools: [any Tool] = people.isEmpty
+            ? baseTools
+            : baseTools + [contactTool]
+
+        let session = LanguageModelSession(
+            model: model,
+            tools: tools,
+            instructions: instructions
+        )
+        let taskDateHints = dateHintsForTask(task, dateHints: dateHints)
+        let taskPrompt = """
+        Today: \(today)
+        Timezone: \(TimeZone.current.identifier)
+        Task: \(task.text)
+        Explicit people in this task:
+        \(people.isEmpty ? "- none" : people.map { "- \($0)" }.joined(separator: "\n"))
+        Date hints:
+        \(taskDateHints.isEmpty ? "- none" : taskDateHints.map { "- \($0.phrase): \($0.isoDate)" }.joined(separator: "\n"))
+
+        Create a calendar proposal for this task only.
+        Do not include details from other tasks.
+        Only put someone in participants if they are listed under "Explicit people in this task".
+        If "Explicit people in this task" is none, participants must be an empty array.
+        """
+
+        let response = try await session.respond(to: taskPrompt, schema: CalendarProposalSchema.schema)
+        results.append(TaskModelResult(task: task, content: response.content))
+    }
+
+    return results
 }
 
 private func formattedToday(calendar: Calendar) -> String {
@@ -223,4 +275,20 @@ private func resolvedDateHints(for input: String, calendar: Calendar) -> [(phras
     }
 
     return hints
+}
+
+private func dateHintsForTask(
+    _ task: InputTask,
+    dateHints: [(phrase: String, isoDate: String)]
+) -> [(phrase: String, isoDate: String)] {
+    let normalizedTask = task.text
+        .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+        .lowercased()
+
+    return dateHints.filter { hint in
+        let normalizedPhrase = hint.phrase
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .lowercased()
+        return normalizedTask.contains(normalizedPhrase)
+    }
 }

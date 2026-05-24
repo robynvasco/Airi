@@ -36,7 +36,7 @@ enum CalendarProposalSchema {
                 description: "A reviewable batch of calendar event drafts.",
                 properties: [
                     .init(name: "summary", description: "Short summary of the requested calendar changes.", schema: .init(type: String.self)),
-                    .init(name: "events", description: "Event drafts extracted from the user request.", schema: .init(arrayOf: .init(referenceTo: "CalendarEventDraft"), minimumElements: 1, maximumElements: 8)),
+                    .init(name: "events", description: "Event draft extracted from the current task.", schema: .init(arrayOf: .init(referenceTo: "CalendarEventDraft"), minimumElements: 1, maximumElements: 1)),
                     .init(name: "clarificationQuestions", description: "Questions to ask before creating events.", schema: .init(arrayOf: .init(referenceTo: "ClarificationQuestion"), minimumElements: 0, maximumElements: 8)),
                     .init(name: "readyForReview", description: "True only when all events are specific enough to show in a review screen.", schema: .init(type: Bool.self))
                 ]
@@ -49,10 +49,9 @@ enum CalendarProposalSchema {
 
 @available(macOS 26.0, *)
 extension GeneratedContent {
-    func terminalCalendarProposalDescription(consistencyChecks: [String]) -> String {
+    func terminalCalendarProposalDescription() -> String {
         var lines: [String] = []
 
-        lines.append("Step 6 - Model proposal")
         lines.append("Summary:")
         lines.append((try? value(String.self, forProperty: "summary")) ?? "No summary generated.")
         lines.append("")
@@ -107,14 +106,6 @@ extension GeneratedContent {
         lines.append("Ready for review: \(ready ? "yes" : "no")")
 
         lines.append("")
-        lines.append("Step 7 - Neutral consistency checks")
-        if consistencyChecks.isEmpty {
-            lines.append("- no issues found by the simple checks")
-        } else {
-            lines.append(contentsOf: consistencyChecks.map { "- \($0)" })
-        }
-
-        lines.append("")
         lines.append("Raw generated JSON:")
         lines.append(jsonString)
 
@@ -123,27 +114,61 @@ extension GeneratedContent {
 }
 
 @available(macOS 26.0, *)
+struct TaskModelResult {
+    var task: InputTask
+    var content: GeneratedContent
+}
+
+@available(macOS 26.0, *)
 enum ProposalValidator {
-    static func checks(for content: GeneratedContent, dateHints: [(phrase: String, isoDate: String)]) -> [String] {
+    static func checks(for results: [TaskModelResult], dateHints: [(phrase: String, isoDate: String)]) -> [String] {
         var checks: [String] = []
 
-        let readyForReview = (try? content.value(Bool.self, forProperty: "readyForReview")) ?? false
-        let questions = (try? content.value([GeneratedContent].self, forProperty: "clarificationQuestions")) ?? []
-        let events = (try? content.value([GeneratedContent].self, forProperty: "events")) ?? []
+        for result in results {
+            let readyForReview = (try? result.content.value(Bool.self, forProperty: "readyForReview")) ?? false
+            let questions = (try? result.content.value([GeneratedContent].self, forProperty: "clarificationQuestions")) ?? []
+            let explicitPeople = Set(PeopleExtractor.explicitPeople(in: result.task))
+            let events = (try? result.content.value([GeneratedContent].self, forProperty: "events")) ?? []
 
-        if readyForReview && !questions.isEmpty {
-            checks.append("The proposal says it is ready, but it still contains clarification questions.")
+            if readyForReview && !questions.isEmpty {
+                checks.append("Task \(result.task.index) says it is ready, but it still contains clarification questions.")
+            }
+
+            if !readyForReview && questions.isEmpty {
+                checks.append("Task \(result.task.index) says it is not ready, but it does not explain what needs clarification.")
+            }
+
+            for event in events {
+                let participants = (try? event.value([String].self, forProperty: "participants")) ?? []
+                for participant in participants where !participantIsAllowed(participant, explicitPeople: explicitPeople) {
+                    checks.append("Task \(result.task.index) produced participant '\(participant)', but that person was not explicitly found in the task.")
+                }
+            }
         }
 
-        if !readyForReview && questions.isEmpty {
-            checks.append("The proposal says it is not ready, but it does not explain what needs clarification.")
-        }
+        let eventDates = Set(results.flatMap { result in
+            ((try? result.content.value([GeneratedContent].self, forProperty: "events")) ?? [])
+                .compactMap { try? $0.value(String.self, forProperty: "startDate") }
+        })
 
-        let eventDates = Set(events.compactMap { try? $0.value(String.self, forProperty: "startDate") })
         for hint in dateHints where !eventDates.contains(hint.isoDate) {
             checks.append("The local date hint '\(hint.phrase) -> \(hint.isoDate)' does not appear in the generated event dates.")
         }
 
         return checks
+    }
+
+    private static func participantIsAllowed(_ participant: String, explicitPeople: Set<String>) -> Bool {
+        let normalizedParticipant = participant
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .lowercased()
+
+        return explicitPeople.contains { person in
+            let normalizedPerson = person
+                .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+                .lowercased()
+
+            return normalizedParticipant.contains(normalizedPerson)
+        }
     }
 }
