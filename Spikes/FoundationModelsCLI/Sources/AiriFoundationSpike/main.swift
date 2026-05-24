@@ -75,10 +75,20 @@ private func run(input: String) async {
         )
 
         let today = formattedToday(calendar: calendar)
+        let tasks = TaskSplitter.split(input)
         let dateHints = resolvedDateHints(for: input, calendar: calendar)
         print("Step 3 - Local preflight")
         print("Today: \(today)")
         print("Timezone: \(TimeZone.current.identifier)")
+        print("Tasks split before calling the model:")
+        if tasks.isEmpty {
+            print("- none")
+        } else {
+            for task in tasks {
+                print("- Task \(task.index): \(task.text)")
+            }
+        }
+        print("")
         print("Date hints found before calling the model:")
         if dateHints.isEmpty {
             print("- none")
@@ -94,6 +104,12 @@ private func run(input: String) async {
 
         Authoritative date hints from deterministic local preflight:
         \(dateHints.isEmpty ? "- none" : dateHints.map { "- \($0.phrase): \($0.isoDate)" }.joined(separator: "\n"))
+
+        Task split from local preflight:
+        \(tasks.isEmpty ? "- none" : tasks.map { "- Task \($0.index): \($0.text)" }.joined(separator: "\n"))
+
+        Use the task split as a strong hint. Each task usually maps to one event.
+        Keep names, dates, and participants attached to the task where they appear.
 
         User request:
         \(input)
