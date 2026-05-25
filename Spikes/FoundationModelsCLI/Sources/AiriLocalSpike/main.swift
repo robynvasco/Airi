@@ -88,9 +88,9 @@ private func run(input: String) {
     }
     print("")
 
-    print("Step 6 - Draft proposals")
-    let events = CalendarProposalBuilder.build(from: calendarExtractions, calendar: calendar)
-    print(CalendarProposalBuilder.terminalDescription(for: events))
+    print("Step 6 - Calendar capability proposals")
+    let proposals = CalendarCapability.propose(from: calendarExtractions, calendar: calendar)
+    print(CalendarCapability.terminalDescription(for: proposals))
     print("")
     print("Nothing was written to Calendar.")
 
