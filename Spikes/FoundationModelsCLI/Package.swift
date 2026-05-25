@@ -3,17 +3,17 @@
 import PackageDescription
 
 let package = Package(
-    name: "FoundationModelsCLI",
+    name: "AiriLocalCLI",
     platforms: [
-        .macOS(.v26)
+        .macOS(.v14)
     ],
     products: [
-        .executable(name: "AiriFoundationSpike", targets: ["AiriFoundationSpike"])
+        .executable(name: "AiriLocalSpike", targets: ["AiriLocalSpike"])
     ],
     targets: [
         .executableTarget(
-            name: "AiriFoundationSpike"
+            name: "AiriLocalSpike",
+            path: "Sources/AiriFoundationSpike"
         )
     ]
 )
-

@@ -1,44 +1,36 @@
-# Airi Foundation Models CLI Spike
+# Airi Local Qwen CLI Spike
 
 This spike tests the technical core of Airi without UI:
 
-- Foundation Models availability
-- guided generation with `DynamicGenerationSchema`
-- tool calling with local Swift tools
-- a typed calendar proposal printed to the terminal
+- local Qwen planning through MLX
+- visible task splitting
+- local tool simulation
+- draft calendar proposals
 - a transparent step-by-step trace of what happens
 
 It does not create real calendar events.
-It also does not ask follow-up questions yet. It only prints questions the model thinks
-Airi might need to ask later.
 
 ## Run
 
 ```bash
 cd Spikes/FoundationModelsCLI
-swift run AiriFoundationSpike "Plane Zahnarzt naechsten Montag um 9 und Call mit Anna Mittwoch 14 Uhr"
+swift run AiriLocalSpike "Plane Zahnarzt naechsten Montag um 9 und Call mit Anna Mittwoch 14 Uhr"
 ```
 
-The machine must support Apple Intelligence, Apple Intelligence must be enabled, and
-the on-device model must be ready.
-
-## Toolchain note
-
-This spike intentionally uses `DynamicGenerationSchema` instead of `@Generable` and
-`@Guide`. On some machines, the macOS 26 Command Line Tools include the Foundation
-Models framework but do not include Apple's `FoundationModelsMacros` compiler plugin.
-The dynamic schema path lets us test model availability and tool calling without that
-macro plugin.
-
-If a future macro-based spike fails with:
+By default it uses:
 
 ```text
-plugin for module 'FoundationModelsMacros' not found
+/Users/robyn/.lmstudio/models/mlx-community/Qwen3.5-9B-MLX-4bit
 ```
 
-install/select a full Xcode that includes the macOS 26 SDK and the Foundation Models
-macro plugin:
+You can override paths with:
 
 ```bash
-sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+export AIRI_QWEN_MODEL_PATH="/path/to/model"
+export AIRI_MLX_GENERATE_PATH="/path/to/mlx_lm.generate"
 ```
+
+## Current Shape
+
+Qwen only understands and plans. Airi's Swift code remains responsible for tools,
+validation, review, and later writing to macOS APIs such as EventKit.

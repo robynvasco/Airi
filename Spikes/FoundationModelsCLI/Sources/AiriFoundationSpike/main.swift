@@ -1,268 +1,89 @@
 import Foundation
-import FoundationModels
-
-guard #available(macOS 26.0, *) else {
-    print("Foundation Models requires macOS 26.0 or newer.")
-    exit(0)
-}
 
 let input = CommandLine.arguments.dropFirst().joined(separator: " ")
 guard !input.isEmpty else {
     print("Usage:")
-    print("  swift run AiriFoundationSpike \"Plane Zahnarzt naechsten Montag um 9 und Call mit Anna Mittwoch 14 Uhr\"")
+    print("  swift run AiriLocalSpike \"Plane Zahnarzt naechsten Montag um 9 und Call mit Anna Mittwoch 14 Uhr\"")
     exit(0)
 }
 
-await run(input: input)
+run(input: input)
 
-@available(macOS 26.0, *)
-private func run(input: String) async {
-        let model = SystemLanguageModel.default
+private func run(input: String) {
+    print("Airi Local Qwen Spike")
+    print("")
+    print("Step 1 - User input")
+    print(input)
+    print("")
 
-        print("Airi Foundation Models Spike")
-        print("")
-        print("Step 1 - User input")
-        print(input)
-        print("")
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.locale = Locale(identifier: "de_DE")
+    calendar.timeZone = .current
 
-        switch model.availability {
-        case .available:
-            print("Step 2 - Local model")
-            print("Apple Foundation Models is available on this Mac.")
-        case .unavailable(let reason):
-            print("Step 2 - Local model")
-            print("Apple Foundation Models is not available: \(availabilityDescription(reason))")
-            print("")
-            print("Enable Apple Intelligence and wait for the on-device model to finish downloading, then run again.")
-            return
-        }
-        print("")
+    let today = formattedToday(calendar: calendar)
+    let dateHints = resolvedDateHints(for: input, calendar: calendar)
 
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.locale = Locale(identifier: "de_DE")
-        calendar.timeZone = .current
+    print("Step 2 - Local model")
+    print("Planner: Qwen via MLX")
+    print("Model path: \(QwenPlanner().modelPath)")
+    print("")
 
-        let recorder = ToolCallRecorder()
-        let baseTools: [any Tool] = [
-            ResolveRelativeDateTool(recorder: recorder, calendar: calendar, referenceDate: Date()),
-            ListCalendarsTool(recorder: recorder)
-        ]
-
-        let instructions = """
-        Create one calendar event proposal from one calendar task.
-
-        Rules:
-        - Do not claim that events were created.
-        - Resolve every relative date and weekday phrase with resolveRelativeDate. Never calculate dates yourself.
-        - Use findContactCandidates only for people explicitly mentioned by the user.
-        - Do not add Airi, the user, or the assistant as participants unless explicitly mentioned.
-        - Use listCalendars once when choosing a calendar.
-        - Keep titles short.
-        - If a duration is missing, use 60 minutes for calls and appointments.
-        - Do not ask for duration if you applied the 60 minute default.
-        - If a participant name matches multiple contacts, include the candidates and add a clarification question.
-        - readyForReview must be false whenever clarificationQuestions is not empty.
-        - Prefer the Personal calendar unless the user indicates work.
-        - Output only the requested structured CalendarBatchDraft.
-        """
-
-        let plannerSession = LanguageModelSession(
-            model: model,
-            tools: [],
-            instructions: """
-            Split the user request into independent actionable tasks.
-
-            For each task, return:
-            - the task text
-            - the task type
-            - suggested tools, if any
-
-            Available task types:
-            - calendarEvent: create or change a calendar event
-            - reminder: create or change a reminder
-            - note: create, update, or summarize notes
-            - file: find, open, move, rename, or summarize files
-            - app: open or control an app
-            - clipboard: read, transform, or use clipboard content
-            - unknown: the request is unclear or unsupported
-
-            Available tools:
-            - resolveRelativeDate: use when a task contains relative dates or weekdays, such as tomorrow, next Monday, Mittwoch, Freitag
-            - findContactCandidates: use when a task names a person who may need contact lookup, such as Anna or Max
-            - listCalendars: use when a calendar event needs a calendar choice, such as Personal or Work
-
-            Rules:
-            - Do not execute anything.
-            - Do not create calendar events.
-            - Do not invent missing details.
-            - Do not mention any app name.
-            - Suggest only tools from the available tools list.
-            """
-        )
-
-        let today = formattedToday(calendar: calendar)
-        let plannedTasks = await planTasks(input: input, session: plannerSession)
-        let fallbackTasks = TaskSplitter.split(input)
-        let tasks = plannedTasks.isEmpty ? fallbackTasks : plannedTasks
-        let dateHints = resolvedDateHints(for: input, calendar: calendar)
-        print("Step 3 - Local preflight")
-        print("Today: \(today)")
-        print("Timezone: \(TimeZone.current.identifier)")
-        print("Tasks planned before proposal generation:")
-        if tasks.isEmpty {
-            print("- none")
-        } else {
-            print(TaskPlanParser.terminalDescription(for: tasks))
-        }
-        if plannedTasks.isEmpty {
-            print("")
-            print("Task planning fallback was used.")
-        }
-        print("")
-        print("Date hints found before calling the model:")
-        if dateHints.isEmpty {
-            print("- none")
-        } else {
-            for hint in dateHints {
-                print("- \(hint.phrase) -> \(hint.isoDate)")
-            }
-        }
-        print("")
-
-        do {
-            print("Step 4 - Ask Apple Intelligence")
-            print("Each task gets its own model call, plus the original input for context.")
-            print("")
-
-            let taskResults = try await generateTaskResults(
-                tasks: tasks,
-                fallbackInput: input,
-                today: today,
-                dateHints: dateHints,
-                model: model,
-                baseTools: baseTools,
-                contactTool: FindContactCandidatesTool(recorder: recorder),
-                instructions: instructions
-            )
-            let allToolCalls = await recorder.snapshot()
-
-            print("Step 5 - Tool calls")
-            if allToolCalls.isEmpty {
-                print("- none")
-            } else {
-                for call in allToolCalls {
-                    print("- \(call)")
-                }
-            }
-            print("")
-
-            print("Step 6 - Model proposals by task")
-            for result in taskResults {
-                print("")
-                print("Task \(result.task.index): \(result.task.text)")
-                print(result.content.terminalCalendarProposalDescription())
-                print("")
-                print(ProposalSanitizer.sanitizedCalendarDescription(for: result))
-            }
-
-            let checks = ProposalValidator.checks(for: taskResults, dateHints: dateHints)
-            print("")
-            print("Step 7 - Neutral consistency checks")
-            if checks.isEmpty {
-                print("- no issues found by the simple checks")
-            } else {
-                for check in checks {
-                    print("- \(check)")
-                }
-            }
-        } catch {
-            print("")
-            print("Generation failed:")
-            print(String(describing: error))
-        }
-}
-
-@available(macOS 26.0, *)
-private func availabilityDescription(
-    _ reason: SystemLanguageModel.Availability.UnavailableReason
-) -> String {
-    switch reason {
-    case .deviceNotEligible:
-        return "device not eligible"
-    case .appleIntelligenceNotEnabled:
-        return "Apple Intelligence not enabled"
-    case .modelNotReady:
-        return "model not ready"
-    @unknown default:
-        return "unknown"
-    }
-}
-
-@available(macOS 26.0, *)
-private func generateTaskResults(
-    tasks: [InputTask],
-    fallbackInput: String,
-    today: String,
-    dateHints: [(phrase: String, isoDate: String)],
-    model: SystemLanguageModel,
-    baseTools: [any Tool],
-    contactTool: FindContactCandidatesTool,
-    instructions: String
-) async throws -> [TaskModelResult] {
-    let effectiveTasks = tasks.isEmpty
-        ? [InputTask(index: 1, text: fallbackInput)]
-        : tasks
-
-    var results: [TaskModelResult] = []
-
-    for task in effectiveTasks {
-        let people = PeopleExtractor.explicitPeople(in: task)
-        let tools: [any Tool] = people.isEmpty
-            ? baseTools
-            : baseTools + [contactTool]
-
-        let session = LanguageModelSession(
-            model: model,
-            tools: tools,
-            instructions: instructions
-        )
-        let taskDateHints = dateHintsForTask(task, dateHints: dateHints)
-        let taskPrompt = """
-        Today: \(today)
-        Timezone: \(TimeZone.current.identifier)
-        Task: \(task.text)
-        Explicit people in this task:
-        \(people.isEmpty ? "- none" : people.map { "- \($0)" }.joined(separator: "\n"))
-        Date hints:
-        \(taskDateHints.isEmpty ? "- none" : taskDateHints.map { "- \($0.phrase): \($0.isoDate)" }.joined(separator: "\n"))
-
-        Create a calendar proposal for this task only.
-        Do not include details from other tasks.
-        Only put someone in participants if they are listed under "Explicit people in this task".
-        If "Explicit people in this task" is none, participants must be an empty array.
-        """
-
-        let response = try await session.respond(to: taskPrompt, schema: CalendarProposalSchema.schema)
-        results.append(TaskModelResult(task: task, content: response.content))
-    }
-
-    return results
-}
-
-@available(macOS 26.0, *)
-private func planTasks(input: String, session: LanguageModelSession) async -> [InputTask] {
-    let prompt = """
-    User request:
-    \(input)
-
-    Split this into independent tasks. Keep each task text short and faithful to the user's words.
-    """
+    let plannedTasks: [InputTask]
+    let rawPlanJSON: String
 
     do {
-        let response = try await session.respond(to: prompt, schema: TaskPlanSchema.schema)
-        return TaskPlanParser.inputTasks(from: response.content)
+        let plan = try QwenPlanner().plan(input: input)
+        plannedTasks = plan.tasks
+        rawPlanJSON = plan.rawJSON
     } catch {
-        return []
+        plannedTasks = TaskSplitter.split(input)
+        rawPlanJSON = ""
+        print("Qwen planning failed, using simple fallback splitter:")
+        print(String(describing: error))
+        print("")
+    }
+
+    let tasks = plannedTasks.isEmpty ? TaskSplitter.split(input) : plannedTasks
+
+    print("Step 3 - Local preflight")
+    print("Today: \(today)")
+    print("Timezone: \(TimeZone.current.identifier)")
+    print("")
+    print("Tasks:")
+    print(TaskPlanParser.terminalDescription(for: tasks))
+    print("")
+    print("Date hints:")
+    if dateHints.isEmpty {
+        print("- none")
+    } else {
+        for hint in dateHints {
+            print("- \(hint.phrase) -> \(hint.isoDate)")
+        }
+    }
+    print("")
+
+    print("Step 4 - Local tool simulation")
+    let toolResults = LocalToolRunner.runTools(for: tasks, dateHints: dateHints)
+    if toolResults.isEmpty {
+        print("- none")
+    } else {
+        for result in toolResults {
+            print("- \(result.call)")
+            print("  -> \(result.output.replacingOccurrences(of: "\n", with: "; "))")
+        }
+    }
+    print("")
+
+    print("Step 5 - Draft proposals")
+    let events = CalendarProposalBuilder.build(from: tasks, dateHints: dateHints)
+    print(CalendarProposalBuilder.terminalDescription(for: events))
+    print("")
+    print("Nothing was written to Calendar.")
+
+    if !rawPlanJSON.isEmpty {
+        print("")
+        print("Raw Qwen JSON:")
+        print(rawPlanJSON)
     }
 }
 
@@ -299,16 +120,26 @@ private func resolvedDateHints(for input: String, calendar: Calendar) -> [(phras
 
     let resolver = DateResolver(calendar: calendar, referenceDate: Date())
     let candidates = [
+        (phrase: "next Monday", key: "monday"),
         (phrase: "naechsten Montag", key: "monday"),
         (phrase: "nächsten Montag", key: "monday"),
+        (phrase: "Monday", key: "monday"),
         (phrase: "Montag", key: "monday"),
+        (phrase: "Tuesday", key: "tuesday"),
         (phrase: "Dienstag", key: "tuesday"),
+        (phrase: "Wednesday", key: "wednesday"),
         (phrase: "Mittwoch", key: "wednesday"),
+        (phrase: "Thursday", key: "thursday"),
         (phrase: "Donnerstag", key: "thursday"),
+        (phrase: "Friday", key: "friday"),
         (phrase: "Freitag", key: "friday"),
+        (phrase: "Saturday", key: "saturday"),
         (phrase: "Samstag", key: "saturday"),
+        (phrase: "Sunday", key: "sunday"),
         (phrase: "Sonntag", key: "sunday"),
+        (phrase: "tomorrow", key: "tomorrow"),
         (phrase: "morgen", key: "tomorrow"),
+        (phrase: "today", key: "today"),
         (phrase: "heute", key: "today")
     ]
 
@@ -331,20 +162,4 @@ private func resolvedDateHints(for input: String, calendar: Calendar) -> [(phras
     }
 
     return hints
-}
-
-private func dateHintsForTask(
-    _ task: InputTask,
-    dateHints: [(phrase: String, isoDate: String)]
-) -> [(phrase: String, isoDate: String)] {
-    let normalizedTask = task.text
-        .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
-        .lowercased()
-
-    return dateHints.filter { hint in
-        let normalizedPhrase = hint.phrase
-            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
-            .lowercased()
-        return normalizedTask.contains(normalizedPhrase)
-    }
 }

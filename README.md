@@ -12,8 +12,8 @@ events", review Airi's structured proposal, and let your Mac do the boring part.
 ## Principles
 
 - **Local first:** no login, no analytics, no hidden cloud calls.
-- **Apple Intelligence-native:** use Apple's on-device Foundation Models where they
-  fit, especially for extraction, rewriting, summarization, and tool use.
+- **Local model-native:** use local open models where they fit, starting with Qwen
+  through MLX for planning and extraction.
 - **Actions over answers:** Airi is not another chatbot. It should help the Mac do
   things.
 - **Reviewable by design:** AI produces proposals. Capabilities execute actions only
@@ -57,9 +57,8 @@ direction.
 
 ## Spikes
 
-- [Foundation Models CLI](Spikes/FoundationModelsCLI/README.md): tests local model
-  availability, tool calling, dynamic guided generation, and deterministic validation
-  without any UI.
+- [Local Qwen CLI](Spikes/FoundationModelsCLI/README.md): tests local model planning,
+  tool selection, draft proposals, and deterministic validation without any UI.
 
 ## Status
 

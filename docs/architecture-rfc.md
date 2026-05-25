@@ -32,8 +32,8 @@ Inputs can come from:
 
 ### Intent
 
-The Apple on-device Foundation Model should be used for language understanding tasks
-that fit a small local model:
+A local model provider should be used for language understanding tasks. The first
+provider is Qwen through MLX:
 
 - extracting calendar events from messy text
 - turning notes into reminders
@@ -42,8 +42,8 @@ that fit a small local model:
 - rewriting titles or descriptions
 - asking concise clarification questions
 
-The model should produce typed Swift structures through guided generation rather than
-free-form JSON whenever possible.
+The model should produce small, strict JSON plans that Swift decodes into typed
+structures. Swift owns validation, permissions, review, and execution.
 
 ### Proposal
 
@@ -161,8 +161,8 @@ Airi/
     Files/
     Windows/
   Intelligence/
-    AppleFoundationModelClient.swift
-    GenerableTypes/
+    QwenMLXPlanner.swift
+    ModelProvider.swift
     PromptSchemas/
   docs/
     architecture-rfc.md
@@ -185,4 +185,3 @@ Airi should:
 6. write a local audit entry
 
 That vertical slice is enough to validate the product promise.
-
