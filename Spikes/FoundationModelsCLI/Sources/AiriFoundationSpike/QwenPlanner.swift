@@ -28,12 +28,7 @@ struct QwenPlanner {
         Keep each task text close to the user's words.
 
         Schema:
-        {"tasks":[{"text":string,"type":"calendarEvent|reminder|note|file|app|clipboard|unknown","suggestedTools":[string]}]}
-
-        Available tools:
-        - resolveRelativeDate: use for relative dates or weekdays
-        - findContactCandidates: use for named people
-        - listCalendars: use for calendar events
+        {"tasks":[{"text":string,"type":"calendarEvent|reminder|note|file|app|clipboard|unknown"}]}
 
         Classification rules:
         - A task with a date or weekday and a time is a calendarEvent unless the user explicitly says reminder.
@@ -59,6 +54,53 @@ struct QwenPlanner {
         }
 
         throw QwenPlannerError.invalidJSON(result)
+    }
+
+    func extractCalendarEvent(
+        from task: InputTask,
+        today: String,
+        timezone: String
+    ) throws -> CalendarTaskExtraction {
+        let prompt = """
+        Extract calendar fields from this one task.
+
+        Context:
+        - Today: \(today)
+        - Timezone: \(timezone)
+
+        Return this exact schema:
+        {"type":"calendarEvent","title":string,"datePhrase":string,"timePhrase":string,"people":[string]}
+
+        Rules:
+        - title is the calendar event title, not the full command.
+        - Remove command words such as Plane, Bitte plane, Schedule, Create, Put.
+        - Keep datePhrase as the user's wording, such as "Mittwoch", "next Monday", or "morgen".
+        - Do not calculate the final date.
+        - Keep timePhrase as the user's wording, such as "14 Uhr", "2pm", or "um 9".
+        - People must include only people explicitly mentioned in this task.
+        - Do not add the user, assistant, or app as people.
+        - If a field is missing, use an empty string or an empty array.
+
+        Task:
+        \(task.text)
+        """
+
+        let result = try runMLX(prompt: prompt)
+        let extraction: CalendarExtraction
+        let rawJSON: String
+
+        if let decoded = decodeCalendarExtraction(from: result) {
+            extraction = decoded.extraction
+            rawJSON = decoded.rawJSON
+        } else if let repaired = repairTrailingBraces(in: result),
+                  let decoded = decodeCalendarExtraction(from: repaired) {
+            extraction = decoded.extraction
+            rawJSON = decoded.rawJSON
+        } else {
+            throw QwenPlannerError.invalidJSON(result)
+        }
+
+        return CalendarTaskExtraction(task: task, extraction: extraction, rawJSON: rawJSON)
     }
 
     private func runMLX(prompt: String) throws -> String {
@@ -90,6 +132,18 @@ struct QwenPlanner {
         }
 
         return output
+    }
+
+    private func decodeCalendarExtraction(
+        from output: String
+    ) -> (extraction: CalendarExtraction, rawJSON: String)? {
+        for json in extractJSONObjects(from: output).reversed() {
+            if let extraction = try? JSONDecoder().decode(CalendarExtraction.self, from: Data(json.utf8)) {
+                return (extraction, json)
+            }
+        }
+
+        return nil
     }
 
     private func extractJSONObjects(from output: String) -> [String] {

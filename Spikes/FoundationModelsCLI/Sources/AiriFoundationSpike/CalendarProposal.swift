@@ -11,22 +11,21 @@ struct CalendarEventDraft {
 
 enum CalendarProposalBuilder {
     static func build(
-        from tasks: [InputTask],
-        dateHints: [(phrase: String, isoDate: String)]
+        from extractions: [CalendarTaskExtraction],
+        calendar: Calendar
     ) -> [CalendarEventDraft] {
-        tasks
-            .filter { $0.type == "calendarEvent" }
-            .map { task in
-                let taskHints = dateHintsForTask(task, dateHints: dateHints)
-                return CalendarEventDraft(
-                    title: title(from: task.text),
-                    startDate: taskHints.first?.isoDate ?? "",
-                    startTime: time(from: task.text) ?? "",
-                    durationMinutes: 60,
-                    participants: PeopleExtractor.explicitPeople(in: task),
-                    calendarName: "Personal"
-                )
-            }
+        let resolver = DateResolver(calendar: calendar, referenceDate: Date())
+
+        return extractions.map { item in
+            CalendarEventDraft(
+                title: item.extraction.title,
+                startDate: resolver.resolve(item.extraction.datePhrase) ?? "",
+                startTime: time(from: item.extraction.timePhrase) ?? "",
+                durationMinutes: 60,
+                participants: item.extraction.people,
+                calendarName: "Personal"
+            )
+        }
     }
 
     static func terminalDescription(for events: [CalendarEventDraft]) -> String {
@@ -43,54 +42,6 @@ enum CalendarProposalBuilder {
         }
         .joined(separator: "\n")
     }
-
-    private static func title(from text: String) -> String {
-        var title = text
-        let prefixes = [
-            "Plane ",
-            "Bitte plane ",
-            "Put ",
-            "Schedule ",
-            "Create "
-        ]
-
-        for prefix in prefixes where title.hasPrefix(prefix) {
-            title = String(title.dropFirst(prefix.count))
-        }
-
-        let cutMarkers = [
-            " am ",
-            " um ",
-            " at ",
-            " on ",
-            " next ",
-            " nächsten ",
-            " naechsten ",
-            " Monday",
-            " Montag",
-            " Tuesday",
-            " Dienstag",
-            " Wednesday",
-            " Mittwoch",
-            " Thursday",
-            " Donnerstag",
-            " Friday",
-            " Freitag",
-            " Saturday",
-            " Samstag",
-            " Sunday",
-            " Sonntag"
-        ]
-
-        for marker in cutMarkers {
-            if let range = title.range(of: marker, options: [.caseInsensitive]) {
-                title = String(title[..<range.lowerBound])
-            }
-        }
-
-        return title.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
     private static func time(from text: String) -> String? {
         let patterns = [
             #"(?i)\b([01]?\d|2[0-3])[:.]([0-5]\d)\b"#,
@@ -132,21 +83,5 @@ enum CalendarProposalBuilder {
         }
 
         return nil
-    }
-}
-
-func dateHintsForTask(
-    _ task: InputTask,
-    dateHints: [(phrase: String, isoDate: String)]
-) -> [(phrase: String, isoDate: String)] {
-    let normalizedTask = task.text
-        .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
-        .lowercased()
-
-    return dateHints.filter { hint in
-        let normalizedPhrase = hint.phrase
-            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
-            .lowercased()
-        return normalizedTask.contains(normalizedPhrase)
     }
 }

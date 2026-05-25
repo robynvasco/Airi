@@ -42,8 +42,11 @@ provider is Qwen through MLX:
 - rewriting titles or descriptions
 - asking concise clarification questions
 
-The model should produce small, strict JSON plans that Swift decodes into typed
-structures. Swift owns validation, permissions, review, and execution.
+The model should produce small, strict JSON structures in explicit passes. First it
+splits the request into typed tasks. Then, for supported task types such as
+`calendarEvent`, a second pass extracts task-specific fields such as title,
+datePhrase, timePhrase, and people. Swift owns date resolution, validation,
+permissions, review, and execution.
 
 ### Proposal
 

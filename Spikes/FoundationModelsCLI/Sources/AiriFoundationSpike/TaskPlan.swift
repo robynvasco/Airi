@@ -7,7 +7,6 @@ struct TaskPlan: Decodable {
 struct PlannedTask: Decodable {
     var text: String
     var type: String
-    var suggestedTools: [String]
 }
 
 enum TaskPlanParser {
@@ -18,7 +17,6 @@ enum TaskPlanParser {
                 text: task.text,
                 source: .model,
                 type: task.type,
-                suggestedTools: task.suggestedTools,
                 reason: "Qwen planner"
             )
         }
@@ -35,7 +33,6 @@ enum TaskPlanParser {
         for task in tasks {
             lines.append("- Task \(task.index): \(task.text)")
             lines.append("  Type: \(task.type)")
-            lines.append("  Suggested tools: \(task.suggestedTools.isEmpty ? "none" : task.suggestedTools.joined(separator: ", "))")
             if !task.reason.isEmpty {
                 lines.append("  Reason: \(task.reason)")
             }

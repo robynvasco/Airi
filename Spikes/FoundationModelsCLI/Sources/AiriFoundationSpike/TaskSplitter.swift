@@ -10,7 +10,6 @@ struct InputTask {
     var text: String
     var source: Source = .fallback
     var type: String = "calendarEvent"
-    var suggestedTools: [String] = []
     var reason: String = ""
 }
 
@@ -35,7 +34,6 @@ enum TaskSplitter {
                 text: cleanTaskPrefix(text, isFirst: offset == 0),
                 source: .fallback,
                 type: "calendarEvent",
-                suggestedTools: [],
                 reason: "Fallback splitter"
             )
         }

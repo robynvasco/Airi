@@ -7,25 +7,25 @@ struct LocalToolResult {
 
 enum LocalToolRunner {
     static func runTools(
-        for tasks: [InputTask],
-        dateHints: [(phrase: String, isoDate: String)]
+        for extractions: [CalendarTaskExtraction],
+        calendar: Calendar
     ) -> [LocalToolResult] {
         var results: [LocalToolResult] = []
         var listedCalendars = false
+        let resolver = DateResolver(calendar: calendar, referenceDate: Date())
 
-        for task in tasks {
-            let taskHints = dateHintsForTask(task, dateHints: dateHints)
-            for hint in taskHints {
+        for item in extractions {
+            let datePhrase = item.extraction.datePhrase
+            if !datePhrase.isEmpty {
                 results.append(
                     LocalToolResult(
-                        call: "resolveRelativeDate(\"\(hint.phrase)\")",
-                        output: hint.isoDate
+                        call: "resolveDatePhrase(\"\(datePhrase)\")",
+                        output: resolver.resolve(datePhrase) ?? "unresolved"
                     )
                 )
             }
 
-            let people = PeopleExtractor.explicitPeople(in: task)
-            for person in people {
+            for person in item.extraction.people {
                 results.append(
                     LocalToolResult(
                         call: "findContactCandidates(\"\(person)\")",
@@ -34,7 +34,7 @@ enum LocalToolRunner {
                 )
             }
 
-            if task.type == "calendarEvent" && !listedCalendars {
+            if !listedCalendars {
                 results.append(
                     LocalToolResult(
                         call: "listCalendars(\"calendar event\")",

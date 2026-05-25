@@ -4,7 +4,8 @@ This spike tests the technical core of Airi without UI:
 
 - local Qwen planning through MLX
 - visible task splitting
-- local tool simulation
+- second-pass calendar field extraction
+- deterministic local resolution
 - draft calendar proposals
 - a transparent step-by-step trace of what happens
 
@@ -32,5 +33,21 @@ export AIRI_MLX_GENERATE_PATH="/path/to/mlx_lm.generate"
 
 ## Current Shape
 
-Qwen only understands and plans. Airi's Swift code remains responsible for tools,
-validation, review, and later writing to macOS APIs such as EventKit.
+Qwen runs in two explicit steps:
+
+1. Split the user request into typed tasks.
+2. For every `calendarEvent`, extract calendar fields:
+
+```json
+{
+  "type": "calendarEvent",
+  "title": "Call mit Anna",
+  "datePhrase": "Mittwoch",
+  "timePhrase": "14 Uhr",
+  "people": ["Anna"]
+}
+```
+
+Swift then resolves date phrases, normalizes times, chooses the default calendar,
+builds draft proposals, validates them, and later writes to macOS APIs such as
+EventKit.

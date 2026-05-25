@@ -57,8 +57,9 @@ direction.
 
 ## Spikes
 
-- [Local Qwen CLI](Spikes/FoundationModelsCLI/README.md): tests local model planning,
-  tool selection, draft proposals, and deterministic validation without any UI.
+- [Local Qwen CLI](Spikes/FoundationModelsCLI/README.md): tests two-step local model
+  planning, calendar-field extraction, draft proposals, and deterministic validation
+  without any UI.
 
 ## Status
 
