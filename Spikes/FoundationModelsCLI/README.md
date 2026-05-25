@@ -18,6 +18,13 @@ cd Spikes/FoundationModelsCLI
 swift run AiriLocalSpike "Plane Zahnarzt naechsten Montag um 9 und Call mit Anna Mittwoch 14 Uhr"
 ```
 
+## Test
+
+```bash
+cd Spikes/FoundationModelsCLI
+swift test
+```
+
 By default it uses:
 
 ```text
@@ -51,3 +58,17 @@ Qwen runs in two explicit steps:
 Swift then resolves date phrases, normalizes times, chooses the default calendar,
 builds draft proposals, validates them, and later writes to macOS APIs such as
 EventKit.
+
+Model JSON is decoded strictly. If Qwen returns malformed JSON, Airi reports the
+error instead of repairing or guessing.
+
+The date resolver is deterministic and covered by tests for:
+
+- `heute`
+- `morgen`
+- `übermorgen`
+- `Mittwoch`
+- `nächste Woche Mittwoch`
+- `übernächste Woche Mittwoch`
+- `01. Mai`
+- `01. Mai 2027`

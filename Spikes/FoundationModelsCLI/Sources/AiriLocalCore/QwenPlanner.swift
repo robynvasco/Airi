@@ -1,10 +1,10 @@
 import Foundation
 
-struct QwenPlanner {
-    var modelPath: String
-    var executablePath: String
+public struct QwenPlanner {
+    public var modelPath: String
+    public var executablePath: String
 
-    init(
+    public init(
         modelPath: String = ProcessInfo.processInfo.environment["AIRI_QWEN_MODEL_PATH"]
             ?? "/Users/robyn/.lmstudio/models/mlx-community/Qwen3.5-9B-MLX-4bit",
         executablePath: String = ProcessInfo.processInfo.environment["AIRI_MLX_GENERATE_PATH"]
@@ -14,7 +14,7 @@ struct QwenPlanner {
         self.executablePath = executablePath
     }
 
-    func plan(input: String) throws -> (tasks: [InputTask], rawJSON: String) {
+    public func plan(input: String) throws -> (tasks: [InputTask], rawJSON: String) {
         guard FileManager.default.isExecutableFile(atPath: executablePath) else {
             throw QwenPlannerError.missingExecutable(executablePath)
         }
@@ -39,24 +39,12 @@ struct QwenPlanner {
         \(input)
         """
 
-        let result = try runMLX(prompt: prompt)
-        let candidates = extractJSONObjects(from: result)
-
-        for json in candidates.reversed() {
-            if let plan = try? JSONDecoder().decode(TaskPlan.self, from: Data(json.utf8)) {
-                return (TaskPlanParser.inputTasks(from: plan), json)
-            }
-        }
-
-        if let repaired = repairTrailingBraces(in: result),
-           let plan = try? JSONDecoder().decode(TaskPlan.self, from: Data(repaired.utf8)) {
-            return (TaskPlanParser.inputTasks(from: plan), repaired)
-        }
-
-        throw QwenPlannerError.invalidJSON(result)
+        let json = try strictJSON(from: try runMLX(prompt: prompt))
+        let plan = try decode(TaskPlan.self, from: json)
+        return (TaskPlanParser.inputTasks(from: plan), json)
     }
 
-    func extractCalendarEvent(
+    public func extractCalendarEvent(
         from task: InputTask,
         today: String,
         timezone: String
@@ -74,6 +62,7 @@ struct QwenPlanner {
         Rules:
         - title is the calendar event title, not the full command.
         - Remove command words such as Plane, Bitte plane, Schedule, Create, Put.
+        - Remove date and time phrases from title.
         - Keep datePhrase as the user's wording, such as "Mittwoch", "next Monday", or "morgen".
         - Do not calculate the final date.
         - Keep timePhrase as the user's wording, such as "14 Uhr", "2pm", or "um 9".
@@ -85,22 +74,9 @@ struct QwenPlanner {
         \(task.text)
         """
 
-        let result = try runMLX(prompt: prompt)
-        let extraction: CalendarExtraction
-        let rawJSON: String
-
-        if let decoded = decodeCalendarExtraction(from: result) {
-            extraction = decoded.extraction
-            rawJSON = decoded.rawJSON
-        } else if let repaired = repairTrailingBraces(in: result),
-                  let decoded = decodeCalendarExtraction(from: repaired) {
-            extraction = decoded.extraction
-            rawJSON = decoded.rawJSON
-        } else {
-            throw QwenPlannerError.invalidJSON(result)
-        }
-
-        return CalendarTaskExtraction(task: task, extraction: extraction, rawJSON: rawJSON)
+        let json = try strictJSON(from: try runMLX(prompt: prompt))
+        let extraction = try decode(CalendarExtraction.self, from: json)
+        return CalendarTaskExtraction(task: task, extraction: extraction, rawJSON: json)
     }
 
     private func runMLX(prompt: String) throws -> String {
@@ -134,70 +110,31 @@ struct QwenPlanner {
         return output
     }
 
-    private func decodeCalendarExtraction(
-        from output: String
-    ) -> (extraction: CalendarExtraction, rawJSON: String)? {
-        for json in extractJSONObjects(from: output).reversed() {
-            if let extraction = try? JSONDecoder().decode(CalendarExtraction.self, from: Data(json.utf8)) {
-                return (extraction, json)
-            }
+    private func strictJSON(from output: String) throws -> String {
+        let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("{"), trimmed.hasSuffix("}") else {
+            throw QwenPlannerError.invalidJSON(output)
         }
 
-        return nil
+        return trimmed
     }
 
-    private func extractJSONObjects(from output: String) -> [String] {
-        var candidates: [String] = []
-        var depth = 0
-        var start: String.Index?
-
-        for index in output.indices {
-            let character = output[index]
-
-            if character == "{" {
-                if depth == 0 {
-                    start = index
-                }
-                depth += 1
-            }
-
-            if character == "}" {
-                depth -= 1
-                if depth == 0, let startIndex = start {
-                    candidates.append(String(output[startIndex...index]))
-                    start = nil
-                }
-            }
+    private func decode<T: Decodable>(_ type: T.Type, from json: String) throws -> T {
+        do {
+            return try JSONDecoder().decode(type, from: Data(json.utf8))
+        } catch {
+            throw QwenPlannerError.invalidJSON(json)
         }
-
-        return candidates
-    }
-
-    private func repairTrailingBraces(in output: String) -> String? {
-        guard let start = output.firstIndex(of: "{") else {
-            return nil
-        }
-
-        var json = String(output[start...]).trimmingCharacters(in: .whitespacesAndNewlines)
-        let openBraces = json.filter { $0 == "{" }.count
-        let closeBraces = json.filter { $0 == "}" }.count
-
-        guard openBraces > closeBraces else {
-            return nil
-        }
-
-        json += String(repeating: "}", count: openBraces - closeBraces)
-        return json
     }
 }
 
-enum QwenPlannerError: Error, CustomStringConvertible {
+public enum QwenPlannerError: Error, CustomStringConvertible {
     case missingExecutable(String)
     case missingModel(String)
     case generationFailed(String)
     case invalidJSON(String)
 
-    var description: String {
+    public var description: String {
         switch self {
         case .missingExecutable(let path):
             return "MLX generator not found or not executable: \(path)"

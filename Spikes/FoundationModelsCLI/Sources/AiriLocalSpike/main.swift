@@ -1,4 +1,5 @@
 import Foundation
+import AiriLocalCore
 
 let input = CommandLine.arguments.dropFirst().joined(separator: " ")
 guard !input.isEmpty else {

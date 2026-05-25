@@ -1,21 +1,27 @@
 import Foundation
 
-struct CalendarExtraction: Decodable {
-    var type: String
-    var title: String
-    var datePhrase: String
-    var timePhrase: String
-    var people: [String]
+public struct CalendarExtraction: Decodable {
+    public var type: String
+    public var title: String
+    public var datePhrase: String
+    public var timePhrase: String
+    public var people: [String]
 }
 
-struct CalendarTaskExtraction {
-    var task: InputTask
-    var extraction: CalendarExtraction
-    var rawJSON: String
+public struct CalendarTaskExtraction {
+    public var task: InputTask
+    public var extraction: CalendarExtraction
+    public var rawJSON: String
+
+    public init(task: InputTask, extraction: CalendarExtraction, rawJSON: String) {
+        self.task = task
+        self.extraction = extraction
+        self.rawJSON = rawJSON
+    }
 }
 
-enum CalendarExtractionFormatter {
-    static func terminalDescription(for extractions: [CalendarTaskExtraction]) -> String {
+public enum CalendarExtractionFormatter {
+    public static func terminalDescription(for extractions: [CalendarTaskExtraction]) -> String {
         guard !extractions.isEmpty else {
             return "- none"
         }

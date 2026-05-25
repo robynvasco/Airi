@@ -1,16 +1,16 @@
 import Foundation
 
-struct TaskPlan: Decodable {
-    var tasks: [PlannedTask]
+public struct TaskPlan: Decodable {
+    public var tasks: [PlannedTask]
 }
 
-struct PlannedTask: Decodable {
-    var text: String
-    var type: String
+public struct PlannedTask: Decodable {
+    public var text: String
+    public var type: String
 }
 
-enum TaskPlanParser {
-    static func inputTasks(from plan: TaskPlan) -> [InputTask] {
+public enum TaskPlanParser {
+    public static func inputTasks(from plan: TaskPlan) -> [InputTask] {
         plan.tasks.enumerated().map { offset, task in
             InputTask(
                 index: offset + 1,
@@ -22,7 +22,7 @@ enum TaskPlanParser {
         }
     }
 
-    static func terminalDescription(for tasks: [InputTask]) -> String {
+    public static func terminalDescription(for tasks: [InputTask]) -> String {
         var lines: [String] = []
 
         if tasks.isEmpty {

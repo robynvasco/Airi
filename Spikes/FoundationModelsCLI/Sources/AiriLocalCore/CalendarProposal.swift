@@ -1,25 +1,25 @@
 import Foundation
 
-struct CalendarEventDraft {
-    var title: String
-    var startDate: String
-    var startTime: String
-    var durationMinutes: Int
-    var participants: [String]
-    var calendarName: String
+public struct CalendarEventDraft {
+    public var title: String
+    public var startDate: String
+    public var startTime: String
+    public var durationMinutes: Int
+    public var participants: [String]
+    public var calendarName: String
 }
 
-enum CalendarProposalBuilder {
-    static func build(
+public enum CalendarProposalBuilder {
+    public static func build(
         from extractions: [CalendarTaskExtraction],
         calendar: Calendar
     ) -> [CalendarEventDraft] {
-        let resolver = DateResolver(calendar: calendar, referenceDate: Date())
+        let resolver = DatePhraseResolver(calendar: calendar, referenceDate: Date())
 
         return extractions.map { item in
             CalendarEventDraft(
                 title: item.extraction.title,
-                startDate: resolver.resolve(item.extraction.datePhrase) ?? "",
+                startDate: resolver.resolveToISODate(item.extraction.datePhrase) ?? "",
                 startTime: time(from: item.extraction.timePhrase) ?? "",
                 durationMinutes: 60,
                 participants: item.extraction.people,
@@ -28,7 +28,7 @@ enum CalendarProposalBuilder {
         }
     }
 
-    static func terminalDescription(for events: [CalendarEventDraft]) -> String {
+    public static func terminalDescription(for events: [CalendarEventDraft]) -> String {
         guard !events.isEmpty else {
             return "- none"
         }

@@ -1,20 +1,34 @@
 import Foundation
 
-struct InputTask {
-    enum Source {
+public struct InputTask {
+    public enum Source {
         case model
         case fallback
     }
 
-    var index: Int
-    var text: String
-    var source: Source = .fallback
-    var type: String = "calendarEvent"
-    var reason: String = ""
+    public var index: Int
+    public var text: String
+    public var source: Source
+    public var type: String
+    public var reason: String
+
+    public init(
+        index: Int,
+        text: String,
+        source: Source = .fallback,
+        type: String = "calendarEvent",
+        reason: String = ""
+    ) {
+        self.index = index
+        self.text = text
+        self.source = source
+        self.type = type
+        self.reason = reason
+    }
 }
 
-enum TaskSplitter {
-    static func split(_ input: String) -> [InputTask] {
+public enum TaskSplitter {
+    public static func split(_ input: String) -> [InputTask] {
         let normalized = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalized.isEmpty else {
             return []
