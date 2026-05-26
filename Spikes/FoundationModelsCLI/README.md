@@ -18,6 +18,17 @@ cd Spikes/FoundationModelsCLI
 swift run AiriLocalSpike "Plane Zahnarzt naechsten Montag um 9 und Call mit Anna Mittwoch 14 Uhr"
 ```
 
+## Menu Bar Prototype
+
+```bash
+cd Spikes/FoundationModelsCLI
+swift run AiriMenuBar
+```
+
+This starts a small macOS menu-bar prototype with sample calendar proposals. It
+uses the real `CalendarReviewBatch` model, but it does not yet call Qwen or write
+to Calendar.
+
 ## Test
 
 ```bash

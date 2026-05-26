@@ -1,6 +1,6 @@
 import Foundation
 
-public struct CalendarReviewBatch {
+public struct CalendarReviewBatch: Sendable {
     public var proposals: [CalendarProposal]
 
     public init(proposals: [CalendarProposal]) {

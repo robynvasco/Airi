@@ -1,6 +1,6 @@
 import Foundation
 
-public struct CalendarEventDraft {
+public struct CalendarEventDraft: Sendable {
     public var title: String
     public var startDate: String
     public var startTime: String
@@ -10,6 +10,28 @@ public struct CalendarEventDraft {
     public var participants: [String]
     public var calendarName: String
     public var notes: String
+
+    public init(
+        title: String,
+        startDate: String,
+        startTime: String,
+        endTime: String,
+        durationMinutes: Int,
+        location: String,
+        participants: [String],
+        calendarName: String,
+        notes: String
+    ) {
+        self.title = title
+        self.startDate = startDate
+        self.startTime = startTime
+        self.endTime = endTime
+        self.durationMinutes = durationMinutes
+        self.location = location
+        self.participants = participants
+        self.calendarName = calendarName
+        self.notes = notes
+    }
 }
 
 public enum CalendarProposalBuilder {

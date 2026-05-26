@@ -9,10 +9,16 @@ let package = Package(
     ],
     products: [
         .library(name: "AiriLocalCore", targets: ["AiriLocalCore"]),
+        .executable(name: "AiriMenuBar", targets: ["AiriMenuBar"]),
         .executable(name: "AiriLocalSpike", targets: ["AiriLocalSpike"])
     ],
     targets: [
         .target(name: "AiriLocalCore"),
+        .executableTarget(
+            name: "AiriMenuBar",
+            dependencies: ["AiriLocalCore"],
+            path: "Sources/AiriMenuBar"
+        ),
         .executableTarget(
             name: "AiriLocalSpike",
             dependencies: ["AiriLocalCore"],

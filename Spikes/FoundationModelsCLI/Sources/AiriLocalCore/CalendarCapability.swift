@@ -1,12 +1,17 @@
 import Foundation
 
-public struct CalendarProposalWarning: Equatable {
+public struct CalendarProposalWarning: Equatable, Sendable {
     public var field: String
     public var message: String
+
+    public init(field: String, message: String) {
+        self.field = field
+        self.message = message
+    }
 }
 
-public struct CalendarProposal {
-    public enum ReviewStatus: Equatable {
+public struct CalendarProposal: Sendable {
+    public enum ReviewStatus: Equatable, Sendable {
         case ready
         case needsReview
     }
@@ -17,6 +22,22 @@ public struct CalendarProposal {
     public var draft: CalendarEventDraft
     public var reviewStatus: ReviewStatus
     public var warnings: [CalendarProposalWarning]
+
+    public init(
+        id: String,
+        isSelected: Bool,
+        sourceInstruction: String,
+        draft: CalendarEventDraft,
+        reviewStatus: ReviewStatus,
+        warnings: [CalendarProposalWarning]
+    ) {
+        self.id = id
+        self.isSelected = isSelected
+        self.sourceInstruction = sourceInstruction
+        self.draft = draft
+        self.reviewStatus = reviewStatus
+        self.warnings = warnings
+    }
 }
 
 public enum CalendarCapability {
