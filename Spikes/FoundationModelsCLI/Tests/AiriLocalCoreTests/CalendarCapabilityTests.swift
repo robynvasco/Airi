@@ -8,8 +8,12 @@ final class CalendarCapabilityTests: XCTestCase {
                 extraction(
                     title: "Call mit Anna",
                     datePhrase: "Mittwoch",
-                    timePhrase: "14 Uhr",
-                    people: ["Anna"]
+                    startTime: "14:00",
+                    endTime: "15:00",
+                    durationMinutes: 60,
+                    location: "online",
+                    people: ["Anna"],
+                    notes: ""
                 )
             ],
             calendar: calendar,
@@ -17,22 +21,29 @@ final class CalendarCapabilityTests: XCTestCase {
         )
 
         XCTAssertEqual(proposals.count, 1)
-        XCTAssertEqual(proposals[0].status, .ready)
+        XCTAssertEqual(proposals[0].reviewStatus, .ready)
         XCTAssertEqual(proposals[0].draft.title, "Call mit Anna")
         XCTAssertEqual(proposals[0].draft.startDate, "2026-05-27")
         XCTAssertEqual(proposals[0].draft.startTime, "14:00")
+        XCTAssertEqual(proposals[0].draft.endTime, "15:00")
+        XCTAssertEqual(proposals[0].draft.durationMinutes, 60)
+        XCTAssertEqual(proposals[0].draft.location, "online")
         XCTAssertEqual(proposals[0].draft.participants, ["Anna"])
-        XCTAssertTrue(proposals[0].clarificationQuestions.isEmpty)
+        XCTAssertTrue(proposals[0].warnings.isEmpty)
     }
 
-    func testAmbiguousDateNeedsClarification() {
+    func testAmbiguousDateNeedsReviewWarning() {
         let proposals = CalendarCapability.propose(
             from: [
                 extraction(
                     title: "Steuertermin",
                     datePhrase: "01. Mai",
-                    timePhrase: "um 10",
-                    people: []
+                    startTime: "10:00",
+                    endTime: "11:00",
+                    durationMinutes: 60,
+                    location: "",
+                    people: [],
+                    notes: ""
                 )
             ],
             calendar: calendar,
@@ -40,27 +51,58 @@ final class CalendarCapabilityTests: XCTestCase {
         )
 
         XCTAssertEqual(proposals.count, 1)
-        XCTAssertEqual(proposals[0].status, .needsClarification)
+        XCTAssertEqual(proposals[0].reviewStatus, .needsReview)
         XCTAssertEqual(proposals[0].draft.title, "Steuertermin")
         XCTAssertEqual(proposals[0].draft.startDate, "")
         XCTAssertEqual(proposals[0].draft.startTime, "10:00")
-        XCTAssertEqual(proposals[0].clarificationQuestions.map(\.field), ["date"])
+        XCTAssertEqual(proposals[0].draft.endTime, "11:00")
+        XCTAssertEqual(proposals[0].warnings.map(\.field), ["date"])
+    }
+
+    func testInvalidEndTimeNeedsReviewWarning() {
+        let proposals = CalendarCapability.propose(
+            from: [
+                extraction(
+                    title: "Termin",
+                    datePhrase: "Mittwoch",
+                    startTime: "12:00",
+                    endTime: "11:00",
+                    durationMinutes: 60,
+                    location: "",
+                    people: [],
+                    notes: ""
+                )
+            ],
+            calendar: calendar,
+            referenceDate: referenceDate
+        )
+
+        XCTAssertEqual(proposals[0].reviewStatus, .needsReview)
+        XCTAssertEqual(proposals[0].warnings.map(\.field), ["duration"])
     }
 
     private func extraction(
         title: String,
         datePhrase: String,
-        timePhrase: String,
-        people: [String]
+        startTime: String,
+        endTime: String,
+        durationMinutes: Int,
+        location: String,
+        people: [String],
+        notes: String
     ) -> CalendarTaskExtraction {
         CalendarTaskExtraction(
-            task: InputTask(index: 1, text: title, source: .model, type: "calendarEvent"),
+            task: InputTask(index: 1, instruction: title, source: .model, type: "calendarEvent"),
             extraction: CalendarExtraction(
                 type: "calendarEvent",
                 title: title,
                 datePhrase: datePhrase,
-                timePhrase: timePhrase,
-                people: people
+                startTime: startTime,
+                endTime: endTime,
+                durationMinutes: durationMinutes,
+                location: location,
+                people: people,
+                notes: notes
             ),
             rawJSON: "{}"
         )

@@ -4,8 +4,12 @@ public struct CalendarExtraction: Decodable {
     public var type: String
     public var title: String
     public var datePhrase: String
-    public var timePhrase: String
+    public var startTime: String
+    public var endTime: String
+    public var durationMinutes: Int
+    public var location: String
     public var people: [String]
+    public var notes: String
 }
 
 public struct CalendarTaskExtraction {
@@ -35,8 +39,12 @@ public enum CalendarExtractionFormatter {
             - Task \(item.task.index): \(item.task.text)
               Title: \(item.extraction.title)
               Date phrase: \(emptyFallback(item.extraction.datePhrase))
-              Time phrase: \(emptyFallback(item.extraction.timePhrase))
+              Start time: \(emptyFallback(item.extraction.startTime))
+              End time: \(emptyFallback(item.extraction.endTime))
+              Duration: \(item.extraction.durationMinutes)m
+              Location: \(emptyFallback(item.extraction.location))
               People: \(people)
+              Notes: \(emptyFallback(item.extraction.notes))
             """
         }
         .joined(separator: "\n")

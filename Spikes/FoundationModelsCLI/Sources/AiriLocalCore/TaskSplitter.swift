@@ -7,23 +7,27 @@ public struct InputTask {
     }
 
     public var index: Int
-    public var text: String
+    public var instruction: String
     public var source: Source
     public var type: String
     public var reason: String
 
     public init(
         index: Int,
-        text: String,
+        instruction: String,
         source: Source = .fallback,
         type: String = "calendarEvent",
         reason: String = ""
     ) {
         self.index = index
-        self.text = text
+        self.instruction = instruction
         self.source = source
         self.type = type
         self.reason = reason
+    }
+
+    public var text: String {
+        instruction
     }
 }
 
@@ -45,7 +49,7 @@ public enum TaskSplitter {
         return parts.enumerated().map { offset, text in
             InputTask(
                 index: offset + 1,
-                text: cleanTaskPrefix(text, isFirst: offset == 0),
+                instruction: cleanTaskPrefix(text, isFirst: offset == 0),
                 source: .fallback,
                 type: "calendarEvent",
                 reason: "Fallback splitter"

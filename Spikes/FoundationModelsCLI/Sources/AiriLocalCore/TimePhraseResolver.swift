@@ -12,6 +12,35 @@ public struct TimePhraseResolution: Equatable {
 }
 
 public enum TimePhraseResolver {
+    public static func validateClockTime(_ time: String) -> TimePhraseResolution {
+        let trimmed = time.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return TimePhraseResolution(status: .unresolved, time: nil, message: "empty time")
+        }
+
+        let pattern = #"^([01]\d|2[0-3]):([0-5]\d)$"#
+        guard
+            let regex = try? NSRegularExpression(pattern: pattern),
+            regex.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)) != nil
+        else {
+            return TimePhraseResolution(status: .unresolved, time: nil, message: "time must be HH:mm")
+        }
+
+        return TimePhraseResolution(status: .resolved, time: trimmed, message: "resolved")
+    }
+
+    public static func minutesBetween(startTime: String, endTime: String) -> Int? {
+        guard
+            let start = minutesSinceMidnight(startTime),
+            let end = minutesSinceMidnight(endTime),
+            end > start
+        else {
+            return nil
+        }
+
+        return end - start
+    }
+
     public static func resolve(_ phrase: String) -> TimePhraseResolution {
         let text = phrase.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else {
@@ -62,5 +91,20 @@ public enum TimePhraseResolver {
         }
 
         return TimePhraseResolution(status: .unresolved, time: nil, message: "time phrase is not supported yet")
+    }
+
+    private static func minutesSinceMidnight(_ time: String) -> Int? {
+        let parts = time.split(separator: ":")
+        guard
+            parts.count == 2,
+            let hour = Int(parts[0]),
+            let minute = Int(parts[1]),
+            (0...23).contains(hour),
+            (0...59).contains(minute)
+        else {
+            return nil
+        }
+
+        return hour * 60 + minute
     }
 }

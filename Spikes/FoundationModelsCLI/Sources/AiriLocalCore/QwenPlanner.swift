@@ -24,16 +24,32 @@ public struct QwenPlanner {
         }
 
         let prompt = """
-        Split the user request into independent USER ACTIONS, not internal tool steps.
-        Keep each task text close to the user's words.
+        Supported task types:
+        - calendarEvent: create or change a calendar event.
+        - reminder: create or change a reminder or todo.
 
-        Schema:
-        {"tasks":[{"text":string,"type":"calendarEvent|reminder|note|file|app|clipboard|unknown"}]}
+        For calendarEvent tasks: 
+        Create one standalone instruction per calendar event that should be created or changed.
+        Include the event topic/title, date, start time, end time or duration, location, participants,
+        calendar hint, and notes when they are present in the original request.
+        If no end time or duration is present in the original request, do not include one in the instruction.
+        If the request contains alternative, optional, tentative, or backup dates, create separate
+        calendarEvent tasks for them and preserve that meaning in the instruction.
+        If the request contains a reason for the event, a conflict, or uncertainty, include it as notes
+        inside the instruction.
+        Do not invent missing details.
 
-        Classification rules:
-        - A task with a date or weekday and a time is a calendarEvent unless the user explicitly says reminder.
-        - Calls, meetings, appointments, Termine, Zahnarzt, Arzt, and events with a time belong to calendarEvent.
-        - Use reminder only when the user asks to be reminded or to add a todo.
+        Identify each task in the user request.
+
+        Return only valid JSON in this exact format:
+        {
+          "tasks": [
+            {
+              "type": "calendarEvent|reminder",
+              "instruction": "Complete standalone instruction for the next step."
+            }
+          ]
+        }
 
         User request:
         \(input)
@@ -50,28 +66,15 @@ public struct QwenPlanner {
         timezone: String
     ) throws -> CalendarTaskExtraction {
         let prompt = """
-        Extract calendar fields from this one task.
-
-        Context:
-        - Today: \(today)
-        - Timezone: \(timezone)
-
-        Return this exact schema:
-        {"type":"calendarEvent","title":string,"datePhrase":string,"timePhrase":string,"people":[string]}
-
         Rules:
-        - title is the calendar event title, not the full command.
-        - Remove command words such as Plane, Bitte plane, Schedule, Create, Put.
-        - Remove date and time phrases from title.
-        - Keep datePhrase as the user's wording, such as "Mittwoch", "next Monday", or "morgen".
-        - Do not calculate the final date.
-        - Keep timePhrase as the user's wording, such as "14 Uhr", "2pm", or "um 9".
-        - People must include only people explicitly mentioned in this task.
-        - Do not add the user, assistant, or app as people.
-        - If a field is missing, use an empty string or an empty array.
 
-        Task:
-        \(task.text)
+        If only a start time exists, set endTime to one hour after startTime and durationMinutes to 60.
+        Do not invent missing details.
+        Return this exact schema for the following task:
+        {"type":"calendarEvent","title":string,"datePhrase":string,"startTime":string,"endTime":string,"durationMinutes":number,"location":string,"people":[string],"notes":string}
+
+        task:
+        \(task.instruction)
         """
 
         let json = try strictJSON(from: try runMLX(prompt: prompt))

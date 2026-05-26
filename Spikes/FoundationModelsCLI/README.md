@@ -6,7 +6,7 @@ This spike tests the technical core of Airi without UI:
 - visible task splitting
 - second-pass calendar field extraction
 - deterministic local resolution
-- calendar capability proposals with ready/needs-clarification status
+- calendar capability proposals with ready/needs-review status
 - a transparent step-by-step trace of what happens
 
 It does not create real calendar events.
@@ -50,20 +50,24 @@ Qwen runs in two explicit steps:
   "type": "calendarEvent",
   "title": "Call mit Anna",
   "datePhrase": "Mittwoch",
-  "timePhrase": "14 Uhr",
-  "people": ["Anna"]
+  "startTime": "14:00",
+  "endTime": "15:00",
+  "durationMinutes": 60,
+  "location": "",
+  "people": ["Anna"],
+  "notes": ""
 }
 ```
 
 Swift then resolves date phrases, normalizes times, chooses the default calendar,
 and asks `CalendarCapability` to produce reviewable proposals. A proposal is either
-`ready` or `needs clarification`. Later, only ready proposals should be allowed to
-write to macOS APIs such as EventKit.
+`ready` or `needs review`. Later, the user can edit proposals and choose which ones
+to create through the app UI before Airi writes to macOS APIs such as EventKit.
 
-Example clarification:
+Example warning:
 
 ```text
-Clarification [date]: Das Datum "01. Mai" ist uneindeutig: date is in the past and no year was given. Welches Datum meinst du?
+Warning [date]: Das Datum "01. Mai" ist uneindeutig: date is in the past and no year was given.
 ```
 
 Model JSON is decoded strictly. If Qwen returns malformed JSON, Airi reports the

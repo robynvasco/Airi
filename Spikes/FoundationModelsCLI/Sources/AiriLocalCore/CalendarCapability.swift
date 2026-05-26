@@ -1,19 +1,19 @@
 import Foundation
 
-public struct ClarificationQuestion: Equatable {
+public struct CalendarProposalWarning: Equatable {
     public var field: String
-    public var question: String
+    public var message: String
 }
 
 public struct CalendarProposal {
-    public enum Status: Equatable {
+    public enum ReviewStatus: Equatable {
         case ready
-        case needsClarification
+        case needsReview
     }
 
     public var draft: CalendarEventDraft
-    public var status: Status
-    public var clarificationQuestions: [ClarificationQuestion]
+    public var reviewStatus: ReviewStatus
+    public var warnings: [CalendarProposalWarning]
 }
 
 public enum CalendarCapability {
@@ -27,14 +27,19 @@ public enum CalendarCapability {
         return extractions.map { item in
             let extraction = item.extraction
             let dateResolution = dateResolver.resolve(extraction.datePhrase)
-            let timeResolution = TimePhraseResolver.resolve(extraction.timePhrase)
-            var questions: [ClarificationQuestion] = []
+            let startTimeResolution = TimePhraseResolver.validateClockTime(extraction.startTime)
+            let endTimeResolution = TimePhraseResolver.validateClockTime(extraction.endTime)
+            let calculatedDuration = TimePhraseResolver.minutesBetween(
+                startTime: extraction.startTime,
+                endTime: extraction.endTime
+            )
+            var warnings: [CalendarProposalWarning] = []
 
             if extraction.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                questions.append(
-                    ClarificationQuestion(
+                warnings.append(
+                    CalendarProposalWarning(
                         field: "title",
-                        question: "Wie soll der Termin heißen?"
+                        message: "Der Termin hat keinen Titel."
                     )
                 )
             }
@@ -43,26 +48,42 @@ public enum CalendarCapability {
             case .resolved:
                 break
             case .ambiguous:
-                questions.append(
-                    ClarificationQuestion(
+                warnings.append(
+                    CalendarProposalWarning(
                         field: "date",
-                        question: "Das Datum \"\(extraction.datePhrase)\" ist uneindeutig: \(dateResolution.message). Welches Datum meinst du?"
+                        message: "Das Datum \"\(extraction.datePhrase)\" ist uneindeutig: \(dateResolution.message)."
                     )
                 )
             case .unresolved:
-                questions.append(
-                    ClarificationQuestion(
+                warnings.append(
+                    CalendarProposalWarning(
                         field: "date",
-                        question: "Ich konnte das Datum \"\(extraction.datePhrase)\" nicht sicher auflösen: \(dateResolution.message). Welches Datum meinst du?"
+                        message: "Das Datum \"\(extraction.datePhrase)\" konnte nicht sicher aufgelöst werden: \(dateResolution.message)."
                     )
                 )
             }
 
-            if timeResolution.status != .resolved {
-                questions.append(
-                    ClarificationQuestion(
+            if startTimeResolution.status != .resolved {
+                warnings.append(
+                    CalendarProposalWarning(
                         field: "time",
-                        question: "Welche Uhrzeit meinst du?"
+                        message: "Die Startzeit ist ungültig oder fehlt."
+                    )
+                )
+            }
+
+            if endTimeResolution.status != .resolved {
+                warnings.append(
+                    CalendarProposalWarning(
+                        field: "endTime",
+                        message: "Die Endzeit ist ungültig oder fehlt."
+                    )
+                )
+            } else if calculatedDuration == nil {
+                warnings.append(
+                    CalendarProposalWarning(
+                        field: "duration",
+                        message: "Die Endzeit liegt nicht nach der Startzeit."
                     )
                 )
             }
@@ -70,16 +91,19 @@ public enum CalendarCapability {
             let draft = CalendarEventDraft(
                 title: extraction.title,
                 startDate: dateResolution.isoDate ?? "",
-                startTime: timeResolution.time ?? "",
-                durationMinutes: 60,
+                startTime: startTimeResolution.time ?? "",
+                endTime: endTimeResolution.time ?? "",
+                durationMinutes: calculatedDuration ?? extraction.durationMinutes,
+                location: extraction.location,
                 participants: extraction.people,
-                calendarName: "Personal"
+                calendarName: "Personal",
+                notes: extraction.notes
             )
 
             return CalendarProposal(
                 draft: draft,
-                status: questions.isEmpty ? .ready : .needsClarification,
-                clarificationQuestions: questions
+                reviewStatus: warnings.isEmpty ? .ready : .needsReview,
+                warnings: warnings
             )
         }
     }
@@ -94,13 +118,21 @@ public enum CalendarCapability {
             let event = proposal.draft
             let date = event.startDate.isEmpty ? "date unknown" : event.startDate
             let time = event.startTime.isEmpty ? "time unknown" : event.startTime
+            let endTime = event.endTime.isEmpty ? "" : "-\(event.endTime)"
             let people = event.participants.isEmpty ? "no participants" : event.participants.joined(separator: ", ")
 
-            lines.append("- \(event.title) | \(date) \(time) | \(event.durationMinutes)m | \(people) | \(event.calendarName)")
-            lines.append("  Status: \(proposal.status == .ready ? "ready" : "needs clarification")")
+            var eventLine = "- \(event.title) | \(date) \(time)\(endTime) | \(event.durationMinutes)m | \(people) | \(event.calendarName)"
+            if !event.location.isEmpty {
+                eventLine += " | \(event.location)"
+            }
+            lines.append(eventLine)
+            lines.append("  Review: \(proposal.reviewStatus == .ready ? "ready" : "needs review")")
+            if !event.notes.isEmpty {
+                lines.append("  Notes: \(event.notes)")
+            }
 
-            for question in proposal.clarificationQuestions {
-                lines.append("  Clarification [\(question.field)]: \(question.question)")
+            for warning in proposal.warnings {
+                lines.append("  Warning [\(warning.field)]: \(warning.message)")
             }
 
             return lines.joined(separator: "\n")

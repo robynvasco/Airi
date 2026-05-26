@@ -5,8 +5,8 @@ public struct TaskPlan: Decodable {
 }
 
 public struct PlannedTask: Decodable {
-    public var text: String
     public var type: String
+    public var instruction: String
 }
 
 public enum TaskPlanParser {
@@ -14,7 +14,7 @@ public enum TaskPlanParser {
         plan.tasks.enumerated().map { offset, task in
             InputTask(
                 index: offset + 1,
-                text: task.text,
+                instruction: task.instruction,
                 source: .model,
                 type: task.type,
                 reason: "Qwen planner"
@@ -31,7 +31,7 @@ public enum TaskPlanParser {
         }
 
         for task in tasks {
-            lines.append("- Task \(task.index): \(task.text)")
+            lines.append("- Task \(task.index): \(task.instruction)")
             lines.append("  Type: \(task.type)")
             if !task.reason.isEmpty {
                 lines.append("  Reason: \(task.reason)")
