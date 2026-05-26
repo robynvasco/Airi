@@ -64,6 +64,15 @@ and asks `CalendarCapability` to produce reviewable proposals. A proposal is eit
 `ready` or `needs review`. Later, the user can edit proposals and choose which ones
 to create through the app UI before Airi writes to macOS APIs such as EventKit.
 
+Reviewable proposals include:
+
+- stable `id`
+- default `isSelected`
+- editable calendar draft fields
+- review status
+- warnings
+- source instruction for transparency
+
 Example warning:
 
 ```text

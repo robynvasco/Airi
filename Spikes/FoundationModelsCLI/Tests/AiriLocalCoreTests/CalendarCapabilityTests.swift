@@ -21,6 +21,9 @@ final class CalendarCapabilityTests: XCTestCase {
         )
 
         XCTAssertEqual(proposals.count, 1)
+        XCTAssertEqual(proposals[0].id, "calendar-1")
+        XCTAssertTrue(proposals[0].isSelected)
+        XCTAssertEqual(proposals[0].sourceInstruction, "Call mit Anna")
         XCTAssertEqual(proposals[0].reviewStatus, .ready)
         XCTAssertEqual(proposals[0].draft.title, "Call mit Anna")
         XCTAssertEqual(proposals[0].draft.startDate, "2026-05-27")

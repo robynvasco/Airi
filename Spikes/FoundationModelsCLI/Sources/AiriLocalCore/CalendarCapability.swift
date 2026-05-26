@@ -11,6 +11,9 @@ public struct CalendarProposal {
         case needsReview
     }
 
+    public var id: String
+    public var isSelected: Bool
+    public var sourceInstruction: String
     public var draft: CalendarEventDraft
     public var reviewStatus: ReviewStatus
     public var warnings: [CalendarProposalWarning]
@@ -101,6 +104,9 @@ public enum CalendarCapability {
             )
 
             return CalendarProposal(
+                id: proposalID(for: item),
+                isSelected: true,
+                sourceInstruction: item.task.instruction,
                 draft: draft,
                 reviewStatus: warnings.isEmpty ? .ready : .needsReview,
                 warnings: warnings
@@ -120,13 +126,16 @@ public enum CalendarCapability {
             let time = event.startTime.isEmpty ? "time unknown" : event.startTime
             let endTime = event.endTime.isEmpty ? "" : "-\(event.endTime)"
             let people = event.participants.isEmpty ? "no participants" : event.participants.joined(separator: ", ")
+            let selection = proposal.isSelected ? "[x]" : "[ ]"
 
-            var eventLine = "- \(event.title) | \(date) \(time)\(endTime) | \(event.durationMinutes)m | \(people) | \(event.calendarName)"
+            var eventLine = "- \(selection) \(event.title) | \(date) \(time)\(endTime) | \(event.durationMinutes)m | \(people) | \(event.calendarName)"
             if !event.location.isEmpty {
                 eventLine += " | \(event.location)"
             }
             lines.append(eventLine)
+            lines.append("  ID: \(proposal.id)")
             lines.append("  Review: \(proposal.reviewStatus == .ready ? "ready" : "needs review")")
+            lines.append("  Source: \(proposal.sourceInstruction)")
             if !event.notes.isEmpty {
                 lines.append("  Notes: \(event.notes)")
             }
@@ -138,5 +147,9 @@ public enum CalendarCapability {
             return lines.joined(separator: "\n")
         }
         .joined(separator: "\n")
+    }
+
+    private static func proposalID(for item: CalendarTaskExtraction) -> String {
+        "calendar-\(item.task.index)"
     }
 }
