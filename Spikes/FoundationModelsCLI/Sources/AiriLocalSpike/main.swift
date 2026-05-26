@@ -50,7 +50,11 @@ private func run(input: String) {
     var calendar = Calendar(identifier: .gregorian)
     calendar.locale = Locale(identifier: "de_DE")
     calendar.timeZone = .current
-    let toolResults = LocalToolRunner.runTools(for: result.calendarExtractions, calendar: calendar)
+    let toolResults = LocalToolRunner.runTools(
+        for: result.calendarExtractions,
+        calendar: calendar,
+        availableCalendarNames: result.availableCalendarNames
+    )
     if toolResults.isEmpty {
         print("- none")
     } else {

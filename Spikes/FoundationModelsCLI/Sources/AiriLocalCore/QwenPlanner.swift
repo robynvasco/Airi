@@ -63,15 +63,23 @@ public struct QwenPlanner: Sendable {
     public func extractCalendarEvent(
         from task: InputTask,
         today: String,
-        timezone: String
+        timezone: String,
+        availableCalendarNames: [String] = []
     ) throws -> CalendarTaskExtraction {
+        let calendarList = availableCalendarNames.isEmpty
+            ? "No calendars were provided."
+            : availableCalendarNames.joined(separator: ", ")
         let prompt = """
         Rules:
 
         If only a start time exists, set endTime to one hour after startTime and durationMinutes to 60.
+        Today is \(today). Timezone is \(timezone).
+        Available calendars: \(calendarList)
+        If the task clearly implies one of the available calendars, set calendarName to that exact calendar name.
+        If no calendar is implied, set calendarName to an empty string.
         Do not invent missing details.
-        Return this exact schema for the following task:
-        {"type":"calendarEvent","title":string,"datePhrase":string,"startTime":string,"endTime":string,"durationMinutes":number,"location":string,"people":[string],"notes":string}
+        Return only valid JSON with this exact shape:
+        {"type":"calendarEvent","title":"","datePhrase":"","startTime":"","endTime":"","durationMinutes":60,"location":"","people":[],"calendarName":"","notes":""}
 
         task:
         \(task.instruction)

@@ -44,9 +44,11 @@ public enum CalendarCapability {
     public static func propose(
         from extractions: [CalendarTaskExtraction],
         calendar: Calendar,
-        referenceDate: Date = Date()
+        referenceDate: Date = Date(),
+        availableCalendarNames: [String] = []
     ) -> [CalendarProposal] {
         let dateResolver = DatePhraseResolver(calendar: calendar, referenceDate: referenceDate)
+        let defaultCalendarName = availableCalendarNames.first ?? ""
 
         return extractions.map { item in
             let extraction = item.extraction
@@ -112,6 +114,22 @@ public enum CalendarCapability {
                 )
             }
 
+            if !availableCalendarNames.isEmpty && extraction.calendarName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                warnings.append(
+                    CalendarProposalWarning(
+                        field: "calendar",
+                        message: "Es wurde kein Kalender aus der Eingabe erkannt."
+                    )
+                )
+            } else if !availableCalendarNames.isEmpty && !availableCalendarNames.contains(extraction.calendarName) {
+                warnings.append(
+                    CalendarProposalWarning(
+                        field: "calendar",
+                        message: "Der Kalender \"\(extraction.calendarName)\" wurde nicht in den macOS-Kalendern gefunden."
+                    )
+                )
+            }
+
             let draft = CalendarEventDraft(
                 title: extraction.title,
                 startDate: dateResolution.isoDate ?? "",
@@ -120,7 +138,7 @@ public enum CalendarCapability {
                 durationMinutes: calculatedDuration ?? extraction.durationMinutes,
                 location: extraction.location,
                 participants: extraction.people,
-                calendarName: "Personal",
+                calendarName: extraction.calendarName.isEmpty ? defaultCalendarName : extraction.calendarName,
                 notes: extraction.notes
             )
 
@@ -147,9 +165,10 @@ public enum CalendarCapability {
             let time = event.startTime.isEmpty ? "time unknown" : event.startTime
             let endTime = event.endTime.isEmpty ? "" : "-\(event.endTime)"
             let people = event.participants.isEmpty ? "no participants" : event.participants.joined(separator: ", ")
+            let calendarName = event.calendarName.isEmpty ? "calendar unknown" : event.calendarName
             let selection = proposal.isSelected ? "[x]" : "[ ]"
 
-            var eventLine = "- \(selection) \(event.title) | \(date) \(time)\(endTime) | \(event.durationMinutes)m | \(people) | \(event.calendarName)"
+            var eventLine = "- \(selection) \(event.title) | \(date) \(time)\(endTime) | \(event.durationMinutes)m | \(people) | \(calendarName)"
             if !event.location.isEmpty {
                 eventLine += " | \(event.location)"
             }

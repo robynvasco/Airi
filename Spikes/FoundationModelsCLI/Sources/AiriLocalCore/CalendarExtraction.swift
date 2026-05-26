@@ -9,7 +9,59 @@ public struct CalendarExtraction: Decodable, Sendable {
     public var durationMinutes: Int
     public var location: String
     public var people: [String]
+    public var calendarName: String
     public var notes: String
+
+    private enum CodingKeys: String, CodingKey {
+        case type
+        case title
+        case datePhrase
+        case startTime
+        case endTime
+        case durationMinutes
+        case location
+        case people
+        case calendarName
+        case notes
+    }
+
+    public init(
+        type: String,
+        title: String,
+        datePhrase: String,
+        startTime: String,
+        endTime: String,
+        durationMinutes: Int,
+        location: String,
+        people: [String],
+        calendarName: String,
+        notes: String
+    ) {
+        self.type = type
+        self.title = title
+        self.datePhrase = datePhrase
+        self.startTime = startTime
+        self.endTime = endTime
+        self.durationMinutes = durationMinutes
+        self.location = location
+        self.people = people
+        self.calendarName = calendarName
+        self.notes = notes
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        type = try container.decode(String.self, forKey: .type)
+        title = try container.decode(String.self, forKey: .title)
+        datePhrase = try container.decode(String.self, forKey: .datePhrase)
+        startTime = try container.decode(String.self, forKey: .startTime)
+        endTime = try container.decode(String.self, forKey: .endTime)
+        durationMinutes = try container.decode(Int.self, forKey: .durationMinutes)
+        location = try container.decode(String.self, forKey: .location)
+        people = try container.decode([String].self, forKey: .people)
+        calendarName = try container.decodeIfPresent(String.self, forKey: .calendarName) ?? ""
+        notes = try container.decode(String.self, forKey: .notes)
+    }
 }
 
 public struct CalendarTaskExtraction: Sendable {
@@ -44,6 +96,7 @@ public enum CalendarExtractionFormatter {
               Duration: \(item.extraction.durationMinutes)m
               Location: \(emptyFallback(item.extraction.location))
               People: \(people)
+              Calendar: \(emptyFallback(item.extraction.calendarName))
               Notes: \(emptyFallback(item.extraction.notes))
             """
         }

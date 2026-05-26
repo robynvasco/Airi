@@ -8,7 +8,8 @@ public struct LocalToolResult {
 public enum LocalToolRunner {
     public static func runTools(
         for extractions: [CalendarTaskExtraction],
-        calendar: Calendar
+        calendar: Calendar,
+        availableCalendarNames: [String] = []
     ) -> [LocalToolResult] {
         var results: [LocalToolResult] = []
         var listedCalendars = false
@@ -38,7 +39,9 @@ public enum LocalToolRunner {
                 results.append(
                     LocalToolResult(
                         call: "listCalendars(\"calendar event\")",
-                        output: "Personal (default), Work, Family"
+                        output: availableCalendarNames.isEmpty
+                            ? "No calendars provided by the app layer."
+                            : availableCalendarNames.joined(separator: "\n")
                     )
                 )
                 listedCalendars = true
@@ -49,13 +52,7 @@ public enum LocalToolRunner {
     }
 
     private static func contactCandidates(for name: String) -> String {
-        let normalized = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let sampleContacts: [String: [String]] = [
-            "anna": ["Anna Mueller <anna@example.local>", "Anna Schmidt <anna.schmidt@example.local>"],
-            "robyn": ["Robyn Vasco <robyn@example.local>"]
-        ]
-
-        return sampleContacts[normalized]?.joined(separator: "\n") ?? "no candidates found"
+        "Contact lookup is not connected yet for \(name)."
     }
 
     private static func terminalDescription(for resolution: DatePhraseResolution) -> String {

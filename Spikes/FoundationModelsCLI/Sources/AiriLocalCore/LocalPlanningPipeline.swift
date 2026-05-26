@@ -5,6 +5,7 @@ public struct LocalPlanningResult: Sendable {
     public var today: String
     public var timezone: String
     public var modelPath: String
+    public var availableCalendarNames: [String]
     public var tasks: [InputTask]
     public var calendarExtractions: [CalendarTaskExtraction]
     public var reviewBatch: CalendarReviewBatch
@@ -21,7 +22,11 @@ public struct LocalPlanningPipeline: Sendable {
         self.planner = planner
     }
 
-    public func run(input: String, referenceDate: Date = Date()) -> LocalPlanningResult {
+    public func run(
+        input: String,
+        referenceDate: Date = Date(),
+        availableCalendarNames: [String] = []
+    ) -> LocalPlanningResult {
         var calendar = Calendar(identifier: .gregorian)
         calendar.locale = Locale(identifier: "de_DE")
         calendar.timeZone = .current
@@ -55,7 +60,8 @@ public struct LocalPlanningPipeline: Sendable {
                 let extraction = try planner.extractCalendarEvent(
                     from: task,
                     today: today,
-                    timezone: timezone
+                    timezone: timezone,
+                    availableCalendarNames: availableCalendarNames
                 )
                 calendarExtractions.append(extraction)
                 rawCalendarJSON.append(extraction.rawJSON)
@@ -67,7 +73,8 @@ public struct LocalPlanningPipeline: Sendable {
         let proposals = CalendarCapability.propose(
             from: calendarExtractions,
             calendar: calendar,
-            referenceDate: referenceDate
+            referenceDate: referenceDate,
+            availableCalendarNames: availableCalendarNames
         )
 
         return LocalPlanningResult(
@@ -75,6 +82,7 @@ public struct LocalPlanningPipeline: Sendable {
             today: today,
             timezone: timezone,
             modelPath: planner.modelPath,
+            availableCalendarNames: availableCalendarNames,
             tasks: tasks,
             calendarExtractions: calendarExtractions,
             reviewBatch: CalendarReviewBatch(proposals: proposals),

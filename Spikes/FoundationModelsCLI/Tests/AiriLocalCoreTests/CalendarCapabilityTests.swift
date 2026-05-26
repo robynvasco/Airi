@@ -84,6 +84,55 @@ final class CalendarCapabilityTests: XCTestCase {
         XCTAssertEqual(proposals[0].warnings.map(\.field), ["duration"])
     }
 
+    func testUsesExtractedCalendarWhenAvailable() {
+        let proposals = CalendarCapability.propose(
+            from: [
+                extraction(
+                    title: "Team Call",
+                    datePhrase: "Mittwoch",
+                    startTime: "12:00",
+                    endTime: "13:00",
+                    durationMinutes: 60,
+                    location: "",
+                    people: [],
+                    calendarName: "Arbeit",
+                    notes: ""
+                )
+            ],
+            calendar: calendar,
+            referenceDate: referenceDate,
+            availableCalendarNames: ["Privat", "Arbeit"]
+        )
+
+        XCTAssertEqual(proposals[0].draft.calendarName, "Arbeit")
+        XCTAssertEqual(proposals[0].reviewStatus, .ready)
+    }
+
+    func testMissingCalendarUsesFirstAvailableCalendarAndWarns() {
+        let proposals = CalendarCapability.propose(
+            from: [
+                extraction(
+                    title: "Team Call",
+                    datePhrase: "Mittwoch",
+                    startTime: "12:00",
+                    endTime: "13:00",
+                    durationMinutes: 60,
+                    location: "",
+                    people: [],
+                    calendarName: "",
+                    notes: ""
+                )
+            ],
+            calendar: calendar,
+            referenceDate: referenceDate,
+            availableCalendarNames: ["Privat", "Arbeit"]
+        )
+
+        XCTAssertEqual(proposals[0].draft.calendarName, "Privat")
+        XCTAssertEqual(proposals[0].reviewStatus, .needsReview)
+        XCTAssertEqual(proposals[0].warnings.map(\.field), ["calendar"])
+    }
+
     private func extraction(
         title: String,
         datePhrase: String,
@@ -92,6 +141,7 @@ final class CalendarCapabilityTests: XCTestCase {
         durationMinutes: Int,
         location: String,
         people: [String],
+        calendarName: String = "",
         notes: String
     ) -> CalendarTaskExtraction {
         CalendarTaskExtraction(
@@ -105,6 +155,7 @@ final class CalendarCapabilityTests: XCTestCase {
                 durationMinutes: durationMinutes,
                 location: location,
                 people: people,
+                calendarName: calendarName,
                 notes: notes
             ),
             rawJSON: "{}"

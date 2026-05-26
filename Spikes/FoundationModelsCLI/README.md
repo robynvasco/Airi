@@ -27,7 +27,9 @@ swift run AiriMenuBar
 
 This starts a small macOS menu-bar prototype. It accepts a user request, runs the
 same local Qwen planning pipeline as the CLI, and shows editable calendar
-proposals. It does not yet write to Calendar.
+proposals. The prototype tries to read writable macOS calendars and passes those
+calendar names into the calendar extraction prompt, so Qwen can choose from real
+local calendars instead of hard-coded names. It does not yet write to Calendar.
 
 ## Test
 
