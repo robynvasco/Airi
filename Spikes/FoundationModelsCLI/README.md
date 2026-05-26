@@ -25,9 +25,9 @@ cd Spikes/FoundationModelsCLI
 swift run AiriMenuBar
 ```
 
-This starts a small macOS menu-bar prototype with sample calendar proposals. It
-uses the real `CalendarReviewBatch` model, but it does not yet call Qwen or write
-to Calendar.
+This starts a small macOS menu-bar prototype. It accepts a user request, runs the
+same local Qwen planning pipeline as the CLI, and shows editable calendar
+proposals. It does not yet write to Calendar.
 
 ## Test
 

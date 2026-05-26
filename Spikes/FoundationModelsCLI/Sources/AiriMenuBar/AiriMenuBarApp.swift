@@ -16,10 +16,15 @@ struct AiriMenuBarApp: App {
 
 @MainActor
 final class CalendarReviewViewModel: ObservableObject {
+    @Published var input: String
     @Published var batch: CalendarReviewBatch
+    @Published var isPlanning = false
+    @Published var statusMessage = "Bereit"
+    @Published var lastResult: LocalPlanningResult?
 
     init() {
-        self.batch = CalendarReviewBatch(proposals: SampleCalendarProposals.items)
+        self.input = ""
+        self.batch = CalendarReviewBatch(proposals: [])
     }
 
     var selectedCount: Int {
@@ -40,6 +45,32 @@ final class CalendarReviewViewModel: ObservableObject {
         }
         batch.proposals[index] = proposal
     }
+
+    func plan() {
+        let request = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !request.isEmpty, !isPlanning else {
+            return
+        }
+
+        isPlanning = true
+        statusMessage = "Plane..."
+
+        Task {
+            let result = await Task.detached(priority: .userInitiated) {
+                LocalPlanningPipeline().run(input: request)
+            }.value
+
+            self.lastResult = result
+            self.batch = result.reviewBatch
+            self.isPlanning = false
+
+            if result.reviewBatch.proposals.isEmpty {
+                self.statusMessage = "Keine Kalendervorschläge"
+            } else {
+                self.statusMessage = "\(result.reviewBatch.proposals.count) Vorschläge"
+            }
+        }
+    }
 }
 
 struct CalendarReviewPopover: View {
@@ -51,10 +82,18 @@ struct CalendarReviewPopover: View {
 
             Divider()
 
+            inputArea
+
+            Divider()
+
             ScrollView {
                 LazyVStack(spacing: 10) {
-                    ForEach($viewModel.batch.proposals, id: \.id) { $proposal in
-                        CalendarProposalRow(proposal: $proposal)
+                    if viewModel.batch.proposals.isEmpty {
+                        emptyState
+                    } else {
+                        ForEach($viewModel.batch.proposals, id: \.id) { $proposal in
+                            CalendarProposalRow(proposal: $proposal)
+                        }
                     }
                 }
                 .padding(12)
@@ -76,7 +115,7 @@ struct CalendarReviewPopover: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Airi")
                     .font(.headline)
-                Text("\(viewModel.selectedCount) von \(viewModel.batch.proposals.count) ausgewählt")
+                Text(selectionText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -90,8 +129,73 @@ struct CalendarReviewPopover: View {
             Button("Keine") {
                 viewModel.deselectAll()
             }
+            .disabled(viewModel.batch.proposals.isEmpty)
         }
         .padding(12)
+    }
+
+    private var inputArea: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            TextField("Was soll Airi vorbereiten?", text: $viewModel.input, axis: .vertical)
+                .lineLimit(3...6)
+                .textFieldStyle(.roundedBorder)
+                .disabled(viewModel.isPlanning)
+                .onSubmit {
+                    viewModel.plan()
+                }
+
+            HStack(spacing: 10) {
+                Text(viewModel.statusMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                if viewModel.isPlanning {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+
+                Button {
+                    viewModel.plan()
+                } label: {
+                    Label("Planen", systemImage: "wand.and.stars")
+                }
+                .disabled(viewModel.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isPlanning)
+            }
+
+            if let planningError = viewModel.lastResult?.planningError {
+                Label(planningError, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .lineLimit(2)
+            }
+
+            if let result = viewModel.lastResult, !result.extractionErrors.isEmpty {
+                ForEach(result.extractionErrors, id: \.self) { error in
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .lineLimit(2)
+                }
+            }
+        }
+        .padding(12)
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "calendar.badge.plus")
+                .font(.system(size: 28))
+                .foregroundStyle(.secondary)
+            Text("Noch keine Vorschläge")
+                .font(.headline)
+            Text("Gib oben einen Auftrag ein.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 36)
     }
 
     private var footer: some View {
@@ -111,6 +215,13 @@ struct CalendarReviewPopover: View {
             .disabled(viewModel.selectedCount == 0)
         }
         .padding(12)
+    }
+
+    private var selectionText: String {
+        if viewModel.batch.proposals.isEmpty {
+            return "Keine Vorschläge"
+        }
+        return "\(viewModel.selectedCount) von \(viewModel.batch.proposals.count) ausgewählt"
     }
 }
 
@@ -171,68 +282,4 @@ struct CalendarProposalRow: View {
             }
         )
     }
-}
-
-enum SampleCalendarProposals {
-    static let items: [CalendarProposal] = [
-        CalendarProposal(
-            id: "calendar-1",
-            isSelected: true,
-            sourceInstruction: "Create a work calendar event for Hochschuldidaktik online on Friday, 12 June, from 10:00 to 11:00.",
-            draft: CalendarEventDraft(
-                title: "Hochschuldidaktik",
-                startDate: "2026-06-12",
-                startTime: "10:00",
-                endTime: "11:00",
-                durationMinutes: 60,
-                location: "online",
-                participants: [],
-                calendarName: "Arbeit",
-                notes: ""
-            ),
-            reviewStatus: .ready,
-            warnings: []
-        ),
-        CalendarProposal(
-            id: "calendar-2",
-            isSelected: true,
-            sourceInstruction: "Create a backup Hochschuldidaktik work calendar event online on Friday, 26 June, at 10:00 because 24 June may conflict.",
-            draft: CalendarEventDraft(
-                title: "Hochschuldidaktik Ausweichtermin",
-                startDate: "2026-06-26",
-                startTime: "10:00",
-                endTime: "11:00",
-                durationMinutes: 60,
-                location: "online",
-                participants: [],
-                calendarName: "Arbeit",
-                notes: "Ausweichtermin, weil am 24.6. eventuell ein Konflikt besteht."
-            ),
-            reviewStatus: .ready,
-            warnings: []
-        ),
-        CalendarProposal(
-            id: "calendar-3",
-            isSelected: true,
-            sourceInstruction: "Create an optional Hochschuldidaktik work calendar event online on Wednesday, 29 July, at 11:15, marked as tentative because not everyone can attend.",
-            draft: CalendarEventDraft(
-                title: "Vielleicht: Hochschuldidaktik",
-                startDate: "2026-07-29",
-                startTime: "11:15",
-                endTime: "12:15",
-                durationMinutes: 60,
-                location: "online",
-                participants: [],
-                calendarName: "Arbeit",
-                notes: "Eher nicht, da nicht alle können. Vielleicht trotzdem eintragen."
-            ),
-            reviewStatus: .needsReview,
-            warnings: [
-                CalendarProposalWarning(
-                    field: "notes",
-                    message: "Der Termin ist optional oder unsicher."
-                )
-            ]
-        )
-    ]
 }

@@ -1,6 +1,6 @@
 import Foundation
 
-public struct QwenPlanner {
+public struct QwenPlanner: Sendable {
     public var modelPath: String
     public var executablePath: String
 

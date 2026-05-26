@@ -1,7 +1,7 @@
 import Foundation
 
-public struct InputTask {
-    public enum Source {
+public struct InputTask: Sendable {
+    public enum Source: Sendable {
         case model
         case fallback
     }

@@ -1,6 +1,6 @@
 import Foundation
 
-public struct CalendarExtraction: Decodable {
+public struct CalendarExtraction: Decodable, Sendable {
     public var type: String
     public var title: String
     public var datePhrase: String
@@ -12,7 +12,7 @@ public struct CalendarExtraction: Decodable {
     public var notes: String
 }
 
-public struct CalendarTaskExtraction {
+public struct CalendarTaskExtraction: Sendable {
     public var task: InputTask
     public var extraction: CalendarExtraction
     public var rawJSON: String
