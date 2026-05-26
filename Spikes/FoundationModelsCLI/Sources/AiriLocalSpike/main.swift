@@ -90,7 +90,11 @@ private func run(input: String) {
 
     print("Step 6 - Calendar capability proposals")
     let proposals = CalendarCapability.propose(from: calendarExtractions, calendar: calendar)
-    print(CalendarCapability.terminalDescription(for: proposals))
+    let reviewBatch = CalendarReviewBatch(proposals: proposals)
+    print(CalendarCapability.terminalDescription(for: reviewBatch.proposals))
+    print("")
+    print("Review batch:")
+    print("- selected: \(reviewBatch.selectedCount)/\(reviewBatch.proposals.count)")
     print("")
     print("Nothing was written to Calendar.")
 

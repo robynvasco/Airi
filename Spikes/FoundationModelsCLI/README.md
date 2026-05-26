@@ -73,6 +73,10 @@ Reviewable proposals include:
 - warnings
 - source instruction for transparency
 
+`CalendarReviewBatch` holds the proposal list for the future menu-bar UI. It can
+select all, deselect all, toggle individual proposals, update edited draft fields,
+and return the currently selected proposals.
+
 Example warning:
 
 ```text
