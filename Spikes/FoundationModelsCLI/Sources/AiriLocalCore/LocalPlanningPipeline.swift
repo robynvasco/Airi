@@ -11,8 +11,18 @@ public struct LocalPlanningResult: Sendable {
     public var reviewBatch: CalendarReviewBatch
     public var planningError: String?
     public var extractionErrors: [String]
+    public var planPrompt: String
+    public var planResponse: String
+    public var calendarPromptExchanges: [PromptExchange]
     public var rawPlanJSON: String
     public var rawCalendarJSON: [String]
+}
+
+public struct PromptExchange: Sendable {
+    public var title: String
+    public var prompt: String
+    public var response: String
+    public var error: String?
 }
 
 public struct LocalPlanningPipeline: Sendable {
@@ -37,6 +47,7 @@ public struct LocalPlanningPipeline: Sendable {
         let plannedTasks: [InputTask]
         let rawPlanJSON: String
         let planningError: String?
+        let planPrompt = planner.planPrompt(input: input)
 
         do {
             let plan = try planner.plan(input: input)
@@ -54,8 +65,16 @@ public struct LocalPlanningPipeline: Sendable {
         var calendarExtractions: [CalendarTaskExtraction] = []
         var rawCalendarJSON: [String] = []
         var extractionErrors: [String] = []
+        var calendarPromptExchanges: [PromptExchange] = []
 
         for task in calendarTasks {
+            let prompt = planner.calendarExtractionPrompt(
+                task: task,
+                today: today,
+                timezone: timezone,
+                availableCalendarNames: availableCalendarNames
+            )
+
             do {
                 let extraction = try planner.extractCalendarEvent(
                     from: task,
@@ -65,8 +84,25 @@ public struct LocalPlanningPipeline: Sendable {
                 )
                 calendarExtractions.append(extraction)
                 rawCalendarJSON.append(extraction.rawJSON)
+                calendarPromptExchanges.append(
+                    PromptExchange(
+                        title: "Step 4 - Task \(task.index)",
+                        prompt: prompt,
+                        response: extraction.rawJSON,
+                        error: nil
+                    )
+                )
             } catch {
-                extractionErrors.append("Task \(task.index): \(String(describing: error))")
+                let message = String(describing: error)
+                extractionErrors.append("Task \(task.index): \(message)")
+                calendarPromptExchanges.append(
+                    PromptExchange(
+                        title: "Step 4 - Task \(task.index)",
+                        prompt: prompt,
+                        response: "",
+                        error: message
+                    )
+                )
             }
         }
 
@@ -88,6 +124,9 @@ public struct LocalPlanningPipeline: Sendable {
             reviewBatch: CalendarReviewBatch(proposals: proposals),
             planningError: planningError,
             extractionErrors: extractionErrors,
+            planPrompt: planPrompt,
+            planResponse: rawPlanJSON,
+            calendarPromptExchanges: calendarPromptExchanges,
             rawPlanJSON: rawPlanJSON,
             rawCalendarJSON: rawCalendarJSON
         )

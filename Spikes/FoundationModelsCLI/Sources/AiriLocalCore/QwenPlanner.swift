@@ -23,7 +23,15 @@ public struct QwenPlanner: Sendable {
             throw QwenPlannerError.missingModel(modelPath)
         }
 
-        let prompt = """
+        let prompt = planPrompt(input: input)
+
+        let json = try strictJSON(from: try runMLX(prompt: prompt))
+        let plan = try decode(TaskPlan.self, from: json)
+        return (TaskPlanParser.inputTasks(from: plan), json)
+    }
+
+    public func planPrompt(input: String) -> String {
+        """
         Supported task types:
         - calendarEvent: create or change a calendar event.
         - reminder: create or change a reminder or todo.
@@ -54,10 +62,6 @@ public struct QwenPlanner: Sendable {
         User request:
         \(input)
         """
-
-        let json = try strictJSON(from: try runMLX(prompt: prompt))
-        let plan = try decode(TaskPlan.self, from: json)
-        return (TaskPlanParser.inputTasks(from: plan), json)
     }
 
     public func extractCalendarEvent(
@@ -66,10 +70,29 @@ public struct QwenPlanner: Sendable {
         timezone: String,
         availableCalendarNames: [String] = []
     ) throws -> CalendarTaskExtraction {
+        let prompt = calendarExtractionPrompt(
+            task: task,
+            today: today,
+            timezone: timezone,
+            availableCalendarNames: availableCalendarNames
+        )
+
+        let json = try strictJSON(from: try runMLX(prompt: prompt))
+        let extraction = try decode(CalendarExtraction.self, from: json)
+        return CalendarTaskExtraction(task: task, extraction: extraction, rawJSON: json)
+    }
+
+    public func calendarExtractionPrompt(
+        task: InputTask,
+        today: String,
+        timezone: String,
+        availableCalendarNames: [String] = []
+    ) -> String {
         let calendarList = availableCalendarNames.isEmpty
             ? "No calendars were provided."
             : availableCalendarNames.joined(separator: ", ")
-        let prompt = """
+
+        return """
         Rules:
 
         If only a start time exists, set endTime to one hour after startTime and durationMinutes to 60.
@@ -84,10 +107,6 @@ public struct QwenPlanner: Sendable {
         task:
         \(task.instruction)
         """
-
-        let json = try strictJSON(from: try runMLX(prompt: prompt))
-        let extraction = try decode(CalendarExtraction.self, from: json)
-        return CalendarTaskExtraction(task: task, extraction: extraction, rawJSON: json)
     }
 
     private func runMLX(prompt: String) throws -> String {

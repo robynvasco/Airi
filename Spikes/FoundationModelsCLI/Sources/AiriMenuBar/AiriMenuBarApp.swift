@@ -228,6 +228,8 @@ struct ActionReviewPopover: View {
                 .foregroundStyle(.secondary)
 
             diagnosticMessages
+
+            PromptTraceView(result: viewModel.lastResult)
         }
         .padding(12)
         .background(.thinMaterial)
@@ -328,6 +330,87 @@ struct ProgressTimeline: View {
             return "circle.circle.fill"
         }
         return "circle"
+    }
+}
+
+struct PromptTraceView: View {
+    let result: LocalPlanningResult?
+
+    var body: some View {
+        DisclosureGroup {
+            VStack(alignment: .leading, spacing: 10) {
+                if let result {
+                    PromptBlock(
+                        title: "Step 3 - Task Prompt",
+                        prompt: result.planPrompt,
+                        response: result.planResponse,
+                        error: result.planningError
+                    )
+
+                    ForEach(Array(result.calendarPromptExchanges.enumerated()), id: \.offset) { _, exchange in
+                        PromptBlock(
+                            title: exchange.title,
+                            prompt: exchange.prompt,
+                            response: exchange.response,
+                            error: exchange.error
+                        )
+                    }
+                } else {
+                    Text("Nach dem ersten Lauf erscheinen hier die Prompts und Modellantworten.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.top, 6)
+        } label: {
+            Label("Prompts und Modellantworten", systemImage: "text.magnifyingglass")
+                .font(.caption)
+        }
+    }
+}
+
+struct PromptBlock: View {
+    let title: String
+    let prompt: String
+    let response: String
+    let error: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption)
+                .fontWeight(.semibold)
+
+            Text("Prompt")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            codeBox(prompt)
+
+            if let error {
+                Text("Fehler")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                codeBox(error)
+            } else {
+                Text("Antwort")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                codeBox(response.isEmpty ? "Keine Antwort gespeichert." : response)
+            }
+        }
+    }
+
+    private func codeBox(_ text: String) -> some View {
+        ScrollView(.horizontal) {
+            Text(text)
+                .font(.system(.caption2, design: .monospaced))
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(7)
+        }
+        .frame(maxHeight: 130)
+        .background(Color(nsColor: .textBackgroundColor).opacity(0.55))
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 }
 
